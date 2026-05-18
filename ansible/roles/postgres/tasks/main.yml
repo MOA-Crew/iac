@@ -1,0 +1,33 @@
+---
+- name: Validate required RDS connection vars are provided
+  ansible.builtin.assert:
+    that:
+      - postgres_rds_host is defined and postgres_rds_host | length > 0
+      - postgres_rds_password is defined and postgres_rds_password | length > 0
+    fail_msg: >-
+      postgres_rds_host 와 postgres_rds_password 는 반드시 외부 주입 필요.
+      예) ansible-playbook ... -e "postgres_rds_host=xxx postgres_rds_password=yyy"
+
+- name: Install PostgreSQL client and python bindings
+  ansible.builtin.apt:
+    name: "{{ postgres_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+# postgresql_ext 모듈은 target host(=EC2)에서 RDS로 접속한다.
+# EC2 ↔ RDS 는 SG로 허용돼 있으므로 그대로 동작.
+# 여러 app 노드가 있어도 한 번만 돌리면 충분해서 run_once 사용.
+- name: Enable PostgreSQL extensions on RDS
+  community.postgresql.postgresql_ext:
+    name: "{{ item }}"
+    db: "{{ postgres_rds_database }}"
+    login_host: "{{ postgres_rds_host }}"
+    login_port: "{{ postgres_rds_port }}"
+    login_user: "{{ postgres_rds_user }}"
+    login_password: "{{ postgres_rds_password }}"
+    state: present
+  loop: "{{ postgres_extensions }}"
+  run_once: true
+  no_log: true

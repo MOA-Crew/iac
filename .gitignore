@@ -17,6 +17,9 @@ override.tf.json
 # Ansible
 *.retry
 
+# Terraform이 생성하는 Ansible 비밀 파일
+ansible/inventories/*/group_vars/all/secrets.yml
+
 # Env / secrets
 .env
 *.pem

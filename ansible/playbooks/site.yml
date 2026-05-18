@@ -7,3 +7,5 @@
   roles:
     - common
     - docker
+    - role: postgres
+      tags: [db, postgres]

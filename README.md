@@ -71,8 +71,8 @@ ansible-playbook -i inventories/dev/hosts.yml playbooks/bootstrap.yml --syntax-c
 - [x] 디렉토리/모듈 골조
 - [x] AWS provider 확정 (`ap-northeast-2`, named profile)
 - [x] network 모듈 실 리소스 (VPC, public/private subnet × 2, IGW, route table)
-- [ ] ec2 모듈 실 리소스 (security group + 인스턴스)
-- [ ] rds 모듈 실 리소스 (subnet group + DB 인스턴스)
+- [x] ec2 모듈 실 리소스 (AMI, key pair, security group, 인스턴스)
+- [x] rds 모듈 실 리소스 (subnet group, 보안그룹, PostgreSQL 16 인스턴스)
 - [ ] Ansible role 실제 구현 (Docker 등)
 - [ ] stage/prod 환경 분리
 

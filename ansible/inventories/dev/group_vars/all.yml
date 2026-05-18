@@ -1,5 +1,0 @@
-base_packages:
-  - curl
-  - git
-  - unzip
-  - python3-pip

@@ -1,0 +1,9 @@
+---
+# 수동 관리 변수. Terraform 의존성 없는 것만 여기.
+base_packages:
+  - curl
+  - git
+  - unzip
+  - python3-pip
+
+timezone: Asia/Seoul

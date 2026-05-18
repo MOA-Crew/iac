@@ -1,0 +1,19 @@
+---
+# postgres role 기본값. 비밀 정보는 여기 두지 않음.
+
+# EC2에 깔 PostgreSQL 클라이언트/라이브러리 패키지.
+# - postgresql-client: psql 등 CLI
+# - python3-psycopg2: ansible의 postgresql_* 모듈이 DB 접속할 때 필요
+postgres_packages:
+  - postgresql-client
+  - python3-psycopg2
+
+# RDS 접속 정보. 값은 inventory / -e / vault 로 외부에서 주입.
+# 기본값은 host/password 외엔 우리 dev 설정과 동일.
+postgres_rds_port: 5432
+postgres_rds_database: swhub
+postgres_rds_user: swhub_admin
+
+# 활성화할 PostgreSQL extension 목록. 필요해지면 여기에 추가.
+postgres_extensions:
+  - vector

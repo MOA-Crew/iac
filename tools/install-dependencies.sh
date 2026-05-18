@@ -6,7 +6,7 @@
 #   - AWS CLI v2  (공식 zip 인스톨러)
 #   - Terraform   (HashiCorp apt repo)
 #   - Ansible     (apt)
-#   - community.general collection (Ansible)
+#   - Ansible collections: community.general, community.postgresql
 #
 # 이미 설치돼 있으면 그 단계는 건너뛴다.
 
@@ -64,8 +64,8 @@ install_ansible() {
     sudo apt-get update -y
     sudo apt-get install -y ansible
   fi
-  log "community.general collection 설치"
-  ansible-galaxy collection install -U community.general
+  log "Ansible collection 설치 (community.general, community.postgresql)"
+  ansible-galaxy collection install -U community.general community.postgresql
 }
 
 main() {
