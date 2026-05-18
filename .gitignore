@@ -8,7 +8,11 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraform.lock.hcl
+
+# tfvars 는 비밀값(DB 비번 등)을 담을 수 있어 커밋 금지.
+# .example 파일은 커밋해서 형식만 공유.
+*.tfvars
+!*.tfvars.example
 
 # Ansible
 *.retry
@@ -19,6 +23,10 @@ override.tf.json
 *.key
 *.crt
 secrets/
+
+# 설치 산출물 (awscli v2 zip 풀면 ./aws/ 가 떨어짐 → 절대 커밋 금지)
+/aws/
+awscliv2.zip
 
 # OS / Editor
 .DS_Store
