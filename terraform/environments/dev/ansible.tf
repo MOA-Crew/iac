@@ -12,7 +12,7 @@ resource "local_file" "ansible_hosts" {
   file_permission = "0644"
   content = templatefile("${path.module}/templates/hosts.tmpl.yml", {
     app_hosts        = module.ec2.public_ips
-    private_key_path = module.ec2.private_key_path
+    private_key_path = module.ec2.ansible_private_key_path
     rds_host         = module.rds.address
     rds_port         = module.rds.port
     rds_database     = module.rds.db_name

@@ -17,6 +17,14 @@ output "private_key_path" {
   value       = abspath(local_sensitive_file.private_key.filename)
 }
 
+# Ansible inventory 에 박을 키 경로.
+# - 상대경로 입력이면 inventory_dir 기준 Jinja 표현으로 변환 → 어디서 ansible 명령을 실행해도 안 깨짐.
+# - 절대경로(~ 포함) 입력이면 그대로 절대경로 사용.
+output "ansible_private_key_path" {
+  description = "Ansible inventory에 들어갈 키 경로 표현. 상대경로면 {{ inventory_dir }} 기준."
+  value = local._key_path_is_absolute ? abspath(local_sensitive_file.private_key.filename) : "{{ inventory_dir }}/../../../${var.private_key_output_path}"
+}
+
 output "summary" {
   value = {
     name_prefix      = local.name_prefix
