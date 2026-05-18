@@ -1,0 +1,16 @@
+---
+- name: Update apt cache on Debian-family systems
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install baseline packages on Debian-family systems
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Set system timezone
+  community.general.timezone:
+    name: "{{ timezone }}"

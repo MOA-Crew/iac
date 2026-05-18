@@ -1,0 +1,9 @@
+---
+- name: Apply base runtime configuration
+  hosts: app
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - docker

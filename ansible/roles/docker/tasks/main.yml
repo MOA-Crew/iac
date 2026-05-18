@@ -1,0 +1,5 @@
+---
+- name: Docker runtime placeholder
+  ansible.builtin.debug:
+    msg: >-
+      Docker/runtime provisioning will be added here after the target host layout is finalized.

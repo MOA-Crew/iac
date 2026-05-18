@@ -1,0 +1,41 @@
+name: Validate IaC Scaffold
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/environments/dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive ../..
+      - name: Terraform init
+        run: terraform init -backend=false
+      - name: Terraform validate
+        run: terraform validate
+
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general
+      - name: Lint inventory graph
+        working-directory: ansible
+        run: ansible-inventory --graph
+      - name: Syntax check playbooks
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventories/dev/hosts.yml playbooks/bootstrap.yml --syntax-check
+          ansible-playbook -i inventories/dev/hosts.yml playbooks/site.yml --syntax-check
