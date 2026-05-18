@@ -43,7 +43,25 @@ variable "private_subnet_cidrs" {
 variable "ec2_instance_count" {
   description = "생성할 EC2 app 노드 수"
   type        = number
-  default     = 2
+  default     = 1
+}
+
+variable "ec2_instance_type" {
+  description = "EC2 인스턴스 타입. t3.small = x86 2GB RAM. GH Actions 무료 러너가 x86이라 빌드 속도 위해 고정."
+  type        = string
+  default     = "t3.small"
+}
+
+variable "private_key_output_path" {
+  description = "Terraform이 자동 생성한 SSH private key 저장 경로. 상대경로면 repo 루트 기준, 절대경로/~ 도 가능."
+  type        = string
+  default     = "sw-hub-dev.pem"
+}
+
+variable "ssh_allowed_cidr" {
+  description = "SSH 접속 허용 CIDR. 키 기반 인증이라 0.0.0.0/0 사용해도 됨."
+  type        = string
+  default     = "0.0.0.0/0"
 }
 
 variable "rds_engine" {

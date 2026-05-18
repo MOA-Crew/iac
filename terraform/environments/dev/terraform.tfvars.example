@@ -4,9 +4,16 @@ environment  = "dev"
 aws_region  = "ap-northeast-2"
 aws_profile = "default"
 
+# 네트워크
 vpc_cidr             = "10.10.0.0/16"
 public_subnet_cidrs  = ["10.10.1.0/24", "10.10.2.0/24"]
 private_subnet_cidrs = ["10.10.11.0/24", "10.10.12.0/24"]
 
-ec2_instance_count = 2
-rds_engine         = "postgres"
+# EC2
+ec2_instance_count      = 1
+ec2_instance_type       = "t3.small"
+private_key_output_path = "sw-hub-dev.pem"
+ssh_allowed_cidr        = "0.0.0.0/0"
+
+# RDS
+rds_engine = "postgres"

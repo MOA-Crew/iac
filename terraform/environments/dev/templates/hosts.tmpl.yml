@@ -1,0 +1,20 @@
+# Terraform이 자동 생성. 직접 편집하지 말 것 — 다음 apply에서 덮어써짐.
+# 재생성: terraform apply (in terraform/environments/dev)
+
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: ${private_key_path}
+
+    # RDS 접속 정보 (비밀번호 제외)
+    postgres_rds_host: ${rds_host}
+    postgres_rds_port: ${rds_port}
+    postgres_rds_database: ${rds_database}
+    postgres_rds_user: ${rds_user}
+  children:
+    app:
+      hosts:
+%{ for idx, ip in app_hosts ~}
+        sw-hub-app-${idx + 1}:
+          ansible_host: ${ip}
+%{ endfor ~}
