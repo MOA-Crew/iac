@@ -15,11 +15,11 @@ variable "engine" {
 variable "engine_version" {
   description = "엔진 버전. postgres는 16.3 권장."
   type        = string
-  default     = "16.3"
+  default     = "16.8"
 }
 
 variable "instance_class" {
-  description = "RDS 인스턴스 클래스. db.t3.* = x86, db.t4g.* = ARM (약 20% 저렴). 빌드와 무관해서 t4g도 OK지만 일관성 위해 t3."
+  description = "RDS 인스턴스 클래스."
   type        = string
   default     = "db.t3.micro"
 }
