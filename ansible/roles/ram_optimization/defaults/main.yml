@@ -1,0 +1,8 @@
+---
+# zram 압축 swap 설정. t3.small (2GB RAM) 같은 작은 노드에 유효.
+zram_percent: 50
+zram_priority: 100
+
+# zram을 쓸 때는 swap 사용을 더 적극적으로 권장하는 편.
+# 원본 디스크 swap이면 60 이하가 낫지만, zram은 메모리 압축이라 100도 OK.
+vm_swappiness: 60

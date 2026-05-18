@@ -6,6 +6,7 @@
 
   roles:
     - common
+    - ram_optimization
     - docker
     - role: postgres
       tags: [db, postgres]
