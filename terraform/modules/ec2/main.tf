@@ -92,10 +92,11 @@ resource "aws_security_group" "this" {
 resource "aws_instance" "this" {
   count = var.instance_count
 
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = var.instance_type
-  subnet_id     = var.network_summary.public_subnet_ids[count.index % length(var.network_summary.public_subnet_ids)]
-  key_name      = aws_key_pair.this.key_name
+  ami                  = data.aws_ami.ubuntu.id
+  instance_type        = var.instance_type
+  subnet_id            = var.network_summary.public_subnet_ids[count.index % length(var.network_summary.public_subnet_ids)]
+  key_name             = aws_key_pair.this.key_name
+  iam_instance_profile = var.iam_instance_profile
 
   vpc_security_group_ids = [aws_security_group.this.id]
 

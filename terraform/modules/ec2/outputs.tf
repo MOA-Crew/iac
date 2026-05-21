@@ -22,7 +22,7 @@ output "private_key_path" {
 # - 절대경로(~ 포함) 입력이면 그대로 절대경로 사용.
 output "ansible_private_key_path" {
   description = "Ansible inventory에 들어갈 키 경로 표현. 상대경로면 {{ inventory_dir }} 기준."
-  value = local._key_path_is_absolute ? abspath(local_sensitive_file.private_key.filename) : "{{ inventory_dir }}/../../../${var.private_key_output_path}"
+  value       = local._key_path_is_absolute ? abspath(local_sensitive_file.private_key.filename) : "{{ inventory_dir }}/../../../${var.private_key_output_path}"
 }
 
 output "summary" {

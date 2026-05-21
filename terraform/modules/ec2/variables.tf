@@ -33,3 +33,9 @@ variable "network_summary" {
   description = "network 모듈에서 넘겨주는 VPC/subnet 메타데이터"
   type        = any
 }
+
+variable "iam_instance_profile" {
+  description = "EC2에 붙일 IAM instance profile 이름. S3 등 AWS API를 키 없이 접근할 때 사용. null이면 미부착."
+  type        = string
+  default     = null
+}

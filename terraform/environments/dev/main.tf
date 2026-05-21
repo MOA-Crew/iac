@@ -18,6 +18,7 @@ module "ec2" {
   private_key_output_path = var.private_key_output_path
   ssh_allowed_cidr        = var.ssh_allowed_cidr
   network_summary         = module.network.summary
+  iam_instance_profile    = aws_iam_instance_profile.app.name
 }
 
 module "rds" {

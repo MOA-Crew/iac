@@ -13,6 +13,11 @@ output "rds_summary" {
   value       = module.rds.summary
 }
 
+output "s3_buckets" {
+  description = "생성된 S3 버킷 (용도 → 버킷 이름)."
+  value       = { for k, m in module.s3 : k => m.bucket_id }
+}
+
 output "rds_endpoint" {
   description = "RDS 접속 주소. 앱 설정에 이걸로 박음."
   value       = module.rds.endpoint
