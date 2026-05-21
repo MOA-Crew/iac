@@ -13,9 +13,9 @@ variable "engine" {
 }
 
 variable "engine_version" {
-  description = "엔진 버전. postgres는 16.3 권장."
+  description = "엔진 버전. 16.8 등 마이너 버전은 2026-05 deprecation 대상이라 16.11+ 사용."
   type        = string
-  default     = "16.8"
+  default     = "16.11"
 }
 
 variable "instance_class" {
