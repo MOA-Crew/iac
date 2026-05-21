@@ -1,0 +1,43 @@
+---
+# AWS CLI v2 설치만 담당. 자격증명은 EC2 instance profile이 자동 제공하므로
+# credentials/config 파일을 박지 않는다 (정적 키 안티패턴 회피).
+# 아키텍처: t3 = x86_64 기준.
+
+- name: AWS CLI 설치 의존 패키지
+  apt:
+    name: [unzip, curl]
+    state: present
+    update_cache: yes
+
+- name: AWS CLI 설치 여부 확인
+  command: aws --version
+  register: aws_cli_check
+  changed_when: false
+  failed_when: false
+
+- name: AWS CLI v2 설치 파일 다운로드
+  get_url:
+    url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp/awscliv2.zip
+    mode: "0644"
+  when: aws_cli_check.rc != 0
+
+- name: AWS CLI v2 압축 해제
+  unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp
+    remote_src: true
+  when: aws_cli_check.rc != 0
+
+- name: AWS CLI v2 설치
+  command: /tmp/aws/install --update
+  when: aws_cli_check.rc != 0
+
+- name: 설치 임시 파일 정리
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/awscliv2.zip
+    - /tmp/aws
+  when: aws_cli_check.rc != 0

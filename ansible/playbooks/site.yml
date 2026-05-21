@@ -7,6 +7,8 @@
   roles:
     - common
     - ram_optimization
+    - role: awscli
+      tags: [awscli]
     - docker
     - role: postgres
       tags: [db, postgres]
