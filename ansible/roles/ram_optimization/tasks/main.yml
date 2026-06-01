@@ -15,13 +15,17 @@
       PRIORITY={{ zram_priority }}
   register: zram_config
 
-- name: Configure vm.swappiness
-  sysctl:
-    name: vm.swappiness
-    value: "{{ vm_swappiness }}"
-    state: present
-    sysctl_set: true
-    reload: true
+- name: Persist vm.swappiness
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-zram-swappiness.conf
+    mode: "0644"
+    content: |
+      vm.swappiness={{ vm_swappiness }}
+  register: swappiness_config
+
+- name: Apply vm.swappiness immediately
+  ansible.builtin.command: "sysctl -w vm.swappiness={{ vm_swappiness }}"
+  changed_when: swappiness_config.changed
 
 - name: Enable zramswap service
   systemd:
