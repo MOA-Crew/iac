@@ -1,0 +1,19 @@
+---
+# Redis role defaults. No secrets are stored here.
+
+redis_project_dir: /opt/moa/redis
+redis_container_name: moa-redis
+redis_image: redis:7-alpine
+redis_port: 6379
+
+# Dev default: bind Redis only to loopback so it is reachable from the same EC2 host only.
+# Do not change this to 0.0.0.0 unless Redis auth and security group boundaries are added.
+redis_bind_address: "127.0.0.1"
+
+redis_data_volume: moa-redis-data
+redis_appendonly: "yes"
+redis_restart_policy: unless-stopped
+
+# Optional. Leave empty for localhost-only dev Redis.
+# If set, the role injects --requirepass into the Redis command and hides compose content from logs.
+redis_password: ""
