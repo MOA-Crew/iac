@@ -1,0 +1,12 @@
+---
+# Cloudflare Tunnel role defaults. Secrets must be injected from inventory, vault, or -e.
+cloudflared_project_dir: /opt/moa/cloudflared
+cloudflared_container_name: moa-cloudflared
+cloudflared_image: cloudflare/cloudflared:latest
+cloudflared_restart_policy: unless-stopped
+cloudflared_origin_url: http://localhost:8080
+cloudflared_hostname: moa.yeoun.org
+cloudflared_network_mode: host
+
+# Required secret at runtime. Do not commit the real token.
+cloudflared_tunnel_token: ""

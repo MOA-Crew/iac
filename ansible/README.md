@@ -10,6 +10,7 @@ Ansible contains environment-specific inventories and reusable roles.
 - `roles/common`: common baseline packages and configuration
 - `roles/docker`: Docker Engine and Compose plugin installation
 - `roles/redis`: Redis Docker Compose service for dev cache/session/verification use
+- `roles/cloudflared`: Cloudflare Tunnel container for reverse proxy ingress
 - `roles/postgres`: RDS PostgreSQL client/extension setup
 
 ## Redis dev runtime
@@ -47,3 +48,19 @@ ansible-playbook ansible/playbooks/site.yml \
 ```
 
 If Redis must be accessed from another host later, prefer ElastiCache. If temporarily exposing Redis beyond localhost, restrict the EC2 security group and set `redis_password`.
+
+## Cloudflare Tunnel
+
+`cloudflared` is managed as a Docker Compose service on the app host.
+
+Required runtime secret:
+
+- `cloudflared_tunnel_token`: Cloudflare Tunnel token. Inject via Ansible Vault, inventory secrets, or `-e`; never commit the real value.
+
+Run only this role:
+
+```bash
+ansible-playbook ansible/playbooks/site.yml --tags cloudflared -e "cloudflared_tunnel_token=..."
+```
+
+Cloudflare DNS/ingress is expected to point public hostnames, such as temporary `*.yeoun.org` records, at the Cloudflare Tunnel and then reverse proxy to the EC2 origin.

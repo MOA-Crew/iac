@@ -12,5 +12,7 @@
     - docker
     - role: redis
       tags: [cache, redis]
+    - role: cloudflared
+      tags: [cloudflared, tunnel]
     - role: postgres
       tags: [db, postgres]
