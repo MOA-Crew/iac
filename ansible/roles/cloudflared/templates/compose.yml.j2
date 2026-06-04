@@ -3,4 +3,5 @@ services:
     image: {{ cloudflared_image }}
     container_name: {{ cloudflared_container_name }}
     restart: {{ cloudflared_restart_policy }}
-    command: tunnel --no-autoupdate run --token {{ cloudflared_tunnel_token | quote }}
+    network_mode: {{ cloudflared_network_mode }}
+    command: tunnel --no-autoupdate --url {{ cloudflared_origin_url | quote }} run --token {{ cloudflared_tunnel_token | quote }}
