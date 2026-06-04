@@ -10,5 +10,7 @@
     - role: awscli
       tags: [awscli]
     - docker
+    - role: cloudflared
+      tags: [cloudflared, tunnel]
     - role: postgres
       tags: [db, postgres]

@@ -1,0 +1,6 @@
+services:
+  cloudflared:
+    image: {{ cloudflared_image }}
+    container_name: {{ cloudflared_container_name }}
+    restart: {{ cloudflared_restart_policy }}
+    command: tunnel --no-autoupdate run --token {{ cloudflared_tunnel_token | quote }}

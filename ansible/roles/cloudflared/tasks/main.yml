@@ -1,0 +1,41 @@
+---
+- name: Validate Cloudflare Tunnel token is provided
+  ansible.builtin.assert:
+    that:
+      - cloudflared_tunnel_token is defined
+      - cloudflared_tunnel_token | length > 0
+    fail_msg: >-
+      cloudflared_tunnel_token is required. Inject it through Ansible Vault,
+      inventory secrets, or -e; do not commit it to git.
+  no_log: true
+
+- name: Create cloudflared project directory
+  ansible.builtin.file:
+    path: "{{ cloudflared_project_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render cloudflared compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ cloudflared_project_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Pull cloudflared image
+  ansible.builtin.command: docker compose pull
+  args:
+    chdir: "{{ cloudflared_project_dir }}"
+  changed_when: true
+  no_log: true
+
+- name: Start cloudflared tunnel
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ cloudflared_project_dir }}"
+  changed_when: true
+  no_log: true
