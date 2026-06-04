@@ -69,3 +69,37 @@ variable "rds_engine" {
   type        = string
   default     = "postgres"
 }
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare account ID. 토큰과 분리해서 계정 교체가 쉽도록 변수로 받는다."
+  type        = string
+}
+
+variable "cloudflare_zone_name" {
+  description = "Cloudflare DNS zone name. TF_VAR_cloudflare_zone_name 환경변수로 주입한다."
+  type        = string
+}
+
+variable "cloudflare_hostname" {
+  description = "Cloudflare Tunnel로 노출할 전체 호스트명. TF_VAR_cloudflare_hostname 환경변수로 주입한다."
+  type        = string
+}
+
+variable "cloudflare_tunnel_name" {
+  description = "Cloudflare Tunnel 이름. 예: moa-dev"
+  type        = string
+  default     = "moa-dev"
+}
+
+variable "cloudflare_origin_service" {
+  description = "Tunnel ingress origin service URL. EC2 connector가 host network면 localhost를 사용한다."
+  type        = string
+  default     = "http://localhost:8080"
+}
+
+variable "cloudflare_tunnel_secret" {
+  description = "선택: Cloudflare Tunnel secret. null이면 Terraform이 random_id로 생성한다. 기존 tunnel import 시에는 기존 secret/상태 전략을 별도로 정한다."
+  type        = string
+  default     = null
+  sensitive   = true
+}

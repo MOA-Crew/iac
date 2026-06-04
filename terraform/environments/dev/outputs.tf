@@ -35,3 +35,19 @@ output "rds_tunnel_command" {
   description = "노트북에서 RDS 접속용 SSH 터널. 그대로 복붙해서 사용."
   value       = "ssh -i ${module.ec2.private_key_path} -L 15432:${module.rds.address}:${module.rds.port} ubuntu@${module.ec2.public_ips[0]}"
 }
+
+output "cloudflare_tunnel_id" {
+  description = "Cloudflare Tunnel ID"
+  value       = cloudflare_zero_trust_tunnel_cloudflared.moa.id
+}
+
+output "cloudflare_hostname" {
+  description = "Cloudflare Tunnel로 공개되는 호스트명"
+  value       = var.cloudflare_hostname
+}
+
+output "cloudflare_tunnel_token" {
+  description = "EC2 cloudflared connector에 주입할 tunnel token. terraform output -raw cloudflare_tunnel_token 로 조회."
+  value       = cloudflare_zero_trust_tunnel_cloudflared.moa.tunnel_token
+  sensitive   = true
+}

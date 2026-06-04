@@ -1,19 +1,21 @@
-project_name = "sw-hub"
-environment  = "dev"
+# dev 환경 Terraform 변수 예시.
+# 실제 값은 terraform.tfvars 또는 CI secret/env로 주입하고, 민감값은 커밋하지 않는다.
 
-aws_region  = "ap-northeast-2"
-aws_profile = "default"
+# Cloudflare API token은 여기에 쓰지 말고 환경변수로 주입:
+# export CLOUDFLARE_API_TOKEN=...
 
-# 네트워크
-vpc_cidr             = "10.10.0.0/16"
-public_subnet_cidrs  = ["10.10.1.0/24", "10.10.2.0/24"]
-private_subnet_cidrs = ["10.10.11.0/24", "10.10.12.0/24"]
+# 도메인/호스트명도 환경변수로 주입하는 것을 기본으로 한다:
+# export TF_VAR_cloudflare_account_id=...
+# export TF_VAR_cloudflare_zone_name=...
+# export TF_VAR_cloudflare_hostname=...
 
-# EC2
-ec2_instance_count      = 1
-ec2_instance_type       = "t3.small"
-private_key_output_path = "sw-hub-dev.pem"
-ssh_allowed_cidr        = "0.0.0.0/0"
+# terraform.tfvars를 쓸 때도 실제 도메인을 하드코딩하지 말고 환경별 파일로 분리한다.
+cloudflare_account_id     = "replace-with-cloudflare-account-id"
+cloudflare_zone_name      = "replace-with-zone-name"
+cloudflare_hostname       = "replace-with-public-hostname"
+cloudflare_tunnel_name    = "moa-dev"
+cloudflare_origin_service = "http://localhost:8080"
 
-# RDS
-rds_engine = "postgres"
+# 선택: 기존 tunnel secret을 직접 관리해야 할 때만 사용.
+# 기본값 null이면 Terraform이 random_id로 생성한다.
+# cloudflare_tunnel_secret = "..."

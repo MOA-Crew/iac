@@ -53,14 +53,17 @@ If Redis must be accessed from another host later, prefer ElastiCache. If tempor
 
 `cloudflared` is managed as a Docker Compose service on the app host.
 
-Required runtime secret:
+Required runtime inputs:
 
-- `cloudflared_tunnel_token`: Cloudflare Tunnel token. Inject via Ansible Vault, inventory secrets, or `-e`; never commit the real value.
+- `cloudflared_tunnel_token`: Cloudflare Tunnel token. Inject via Ansible Vault, inventory secrets, environment variable, or `-e`; never commit the real value.
+- `cloudflared_hostname`: Public hostname. Inject via `MOA_PUBLIC_HOSTNAME`, inventory, or `-e`; do not hardcode environment-specific domains in the role.
 
 Run only this role:
 
 ```bash
-ansible-playbook ansible/playbooks/site.yml --tags cloudflared -e "cloudflared_tunnel_token=..."
+export MOA_PUBLIC_HOSTNAME=...
+export CLOUDFLARED_TUNNEL_TOKEN=...
+ansible-playbook ansible/playbooks/site.yml --tags cloudflared
 ```
 
-Cloudflare DNS/ingress is expected to point public hostnames, such as temporary `*.yeoun.org` records, at the Cloudflare Tunnel and then reverse proxy to the EC2 origin.
+Cloudflare DNS/ingress is expected to point the configured public hostname at the Cloudflare Tunnel and then reverse proxy to the EC2 origin.

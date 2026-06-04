@@ -16,3 +16,8 @@ provider "aws" {
     }
   }
 }
+
+# Cloudflare provider 설정.
+# API token은 CLOUDFLARE_API_TOKEN 환경변수로 주입한다.
+# 계정/존/호스트명은 variables로 분리해서 도메인이나 터널 교체가 쉽도록 한다.
+provider "cloudflare" {}
