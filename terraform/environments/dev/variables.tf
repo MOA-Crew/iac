@@ -76,15 +76,13 @@ variable "cloudflare_account_id" {
 }
 
 variable "cloudflare_zone_name" {
-  description = "Cloudflare DNS zone name. 예: yeoun.org"
+  description = "Cloudflare DNS zone name. TF_VAR_cloudflare_zone_name 환경변수로 주입한다."
   type        = string
-  default     = "yeoun.org"
 }
 
 variable "cloudflare_hostname" {
-  description = "Cloudflare Tunnel로 노출할 전체 호스트명. 예: moa.yeoun.org"
+  description = "Cloudflare Tunnel로 노출할 전체 호스트명. TF_VAR_cloudflare_hostname 환경변수로 주입한다."
   type        = string
-  default     = "moa.yeoun.org"
 }
 
 variable "cloudflare_tunnel_name" {

@@ -1,12 +1,15 @@
 ---
-- name: Validate Cloudflare Tunnel token is provided
+- name: Validate Cloudflare Tunnel runtime inputs are provided
   ansible.builtin.assert:
     that:
       - cloudflared_tunnel_token is defined
       - cloudflared_tunnel_token | length > 0
+      - cloudflared_hostname is defined
+      - cloudflared_hostname | length > 0
     fail_msg: >-
-      cloudflared_tunnel_token is required. Inject it through Ansible Vault,
-      inventory secrets, or -e; do not commit it to git.
+      cloudflared_tunnel_token and cloudflared_hostname are required. Inject
+      them through Ansible Vault, inventory, environment variables, or -e; do
+      not commit secrets to git.
   no_log: true
 
 - name: Create cloudflared project directory
