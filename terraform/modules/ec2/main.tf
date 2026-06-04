@@ -45,35 +45,11 @@ resource "local_sensitive_file" "private_key" {
   file_permission = "0600"
 }
 
-# EC2 보안그룹. SSH는 키 기반 인증만 사용하므로 IP 제한은 운영자 판단에 위임.
+# EC2 보안그룹. Cloudflare Tunnel 기반 아웃바운드 연결만 사용하므로 퍼블릭 인바운드는 열지 않음.
 resource "aws_security_group" "this" {
   name        = "${local.name_prefix}-ec2-sg"
   description = "Security group for ${local.name_prefix} app nodes"
   vpc_id      = var.network_summary.vpc_id
-
-  ingress {
-    description = "SSH (key-based auth only)"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr]
-  }
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   egress {
     description = "All outbound"
