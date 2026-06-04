@@ -51,6 +51,8 @@ resource "aws_security_group" "this" {
   description = "Security group for ${local.name_prefix} app nodes"
   vpc_id      = var.network_summary.vpc_id
 
+  ingress = []
+
   egress {
     description = "All outbound"
     from_port   = 0
