@@ -51,7 +51,13 @@ resource "aws_security_group" "this" {
   description = "Security group for ${local.name_prefix} app nodes"
   vpc_id      = var.network_summary.vpc_id
 
-  ingress = []
+  ingress {
+    description = "SSH access for operations"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   egress {
     description = "All outbound"
