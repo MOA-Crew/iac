@@ -30,7 +30,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install ansible-core
-          ansible-galaxy collection install community.general
+          ansible-galaxy collection install community.general community.postgresql
       - name: Lint inventory graph
         working-directory: ansible
         run: ansible-inventory --graph
