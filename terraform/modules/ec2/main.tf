@@ -84,6 +84,15 @@ resource "aws_instance" "this" {
 
   vpc_security_group_ids = [aws_security_group.this.id]
 
+  # IMDSv2 강제: 토큰 없는 IMDSv1 접근을 차단한다.
+  # 앱에 SSRF 취약점이 있어도 메타데이터(IAM 역할 임시 자격증명) 탈취를 막기 위함.
+  # hop_limit=1: 앱은 host 네트워크로 동작하므로 1홉이면 IMDS 접근에 충분.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   lifecycle {
     # data.aws_ami.ubuntu가 most_recent라 새 우분투 AMI가 나오면 ami 값이 바뀐다.
     # 자동 apply(CI)가 인스턴스를 통째로 교체(다운타임/IP 변경/재배포)하지 않도록 ami 변경은 무시.
