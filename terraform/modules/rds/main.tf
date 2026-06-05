@@ -76,6 +76,12 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot     = true
   deletion_protection     = false
 
+  lifecycle {
+    # auto_minor_version_upgrade(기본 true)로 마이너 버전이 자동 상승하므로
+    # terraform이 그걸 다운그레이드로 되돌리려다 apply 실패하지 않도록 무시한다.
+    ignore_changes = [engine_version]
+  }
+
   tags = {
     Name = "${local.name_prefix}-db"
   }
