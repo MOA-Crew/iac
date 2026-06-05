@@ -5,8 +5,9 @@
 #   2) ~/.aws/credentials 의 [profile] 블록  ← 로컬 개발 추천
 #   3) EC2 instance profile / OIDC (CI 환경)
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
+  # 로컬 개발: profile 사용. CI(OIDC): aws_profile=""로 두면 null이 되어 환경변수(임시자격증명)를 사용.
+  profile = var.aws_profile != "" ? var.aws_profile : null
 
   default_tags {
     tags = {

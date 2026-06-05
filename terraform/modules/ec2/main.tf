@@ -84,6 +84,13 @@ resource "aws_instance" "this" {
 
   vpc_security_group_ids = [aws_security_group.this.id]
 
+  lifecycle {
+    # data.aws_ami.ubuntu가 most_recent라 새 우분투 AMI가 나오면 ami 값이 바뀐다.
+    # 자동 apply(CI)가 인스턴스를 통째로 교체(다운타임/IP 변경/재배포)하지 않도록 ami 변경은 무시.
+    # AMI 교체가 필요하면 의도적으로 이 줄을 풀고 적용한다.
+    ignore_changes = [ami]
+  }
+
   tags = {
     Name = "${local.name_prefix}-app-${count.index + 1}"
     Role = "app"
