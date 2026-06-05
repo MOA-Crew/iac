@@ -84,6 +84,15 @@ resource "aws_instance" "this" {
 
   vpc_security_group_ids = [aws_security_group.this.id]
 
+  # IMDSv2 강제: 토큰 없는 IMDSv1 접근을 차단한다.
+  # 앱에 SSRF 취약점이 있어도 메타데이터(IAM 역할 임시 자격증명) 탈취를 막기 위함.
+  # hop_limit=1: 앱은 host 네트워크로 동작하므로 1홉이면 IMDS 접근에 충분.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   tags = {
     Name = "${local.name_prefix}-app-${count.index + 1}"
     Role = "app"
