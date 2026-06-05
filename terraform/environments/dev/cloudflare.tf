@@ -15,6 +15,13 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "moa" {
   account_id = var.cloudflare_account_id
   name       = var.cloudflare_tunnel_name
   secret     = coalesce(var.cloudflare_tunnel_secret, random_id.cloudflare_tunnel_secret.b64_std)
+
+  lifecycle {
+    # 기존 터널을 import한 경우, secret은 cloudflare API로 다시 읽을 수 없어 state에 비어 있다.
+    # 이를 무시하지 않으면 매 apply마다 secret 변경=터널 재생성으로 잡혀 라이브 터널(cloudflared 토큰)이 끊긴다.
+    # 따라서 secret 변경은 무시한다. (의도적 시크릿 회전이 필요하면 이 줄을 풀고 토큰을 재발급한다.)
+    ignore_changes = [secret]
+  }
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "moa" {
