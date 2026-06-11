@@ -107,11 +107,24 @@ variable "cloudflare_zone_name" {
 variable "cloudflare_hostname_prod" {
   description = "prod 공개 호스트명. TF_VAR_cloudflare_hostname_prod 로 주입(예: moa.yeoun.org)."
   type        = string
+
+  validation {
+    # 빈 값이면 CI에서 미설정 secret이 ""로 치환돼 들어온 것. TF_VAR=""는 '설정됨'으로 취급돼
+    # required 체크를 통과하고, RDS 등이 먼저 생성된 뒤 Cloudflare 단계에서야 깨지는 부분 apply가 된다.
+    # plan 단계에서 차단해 그 절반-적용을 막는다.
+    condition     = length(trimspace(var.cloudflare_hostname_prod)) > 0
+    error_message = "cloudflare_hostname_prod 가 비어 있습니다. repo secret TF_VAR_CLOUDFLARE_HOSTNAME_PROD(예: moa.yeoun.org)를 설정하세요."
+  }
 }
 
 variable "cloudflare_hostname_dev" {
   description = "dev 공개 호스트명. TF_VAR_cloudflare_hostname_dev 로 주입(예: dev-moa.yeoun.org)."
   type        = string
+
+  validation {
+    condition     = length(trimspace(var.cloudflare_hostname_dev)) > 0
+    error_message = "cloudflare_hostname_dev 가 비어 있습니다. repo secret TF_VAR_CLOUDFLARE_HOSTNAME_DEV(예: dev-moa.yeoun.org)를 설정하세요."
+  }
 }
 
 variable "cloudflare_origin_service" {
