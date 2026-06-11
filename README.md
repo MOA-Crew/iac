@@ -9,7 +9,7 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 
 **인프라 변경은 GitOps로 적용한다.** `terraform/**` 를 고쳐 PR을 올리면 CI가 `plan` 을 돌려 PR 코멘트로 보여주고, `dev` 머지 시 수동 승인 게이트를 거쳐 `apply` 된다. 인증은 GitHub OIDC라 **로컬에 AWS/Terraform 키를 둘 필요가 없다.**
 
-> 📐 아키텍처 상세 → [docs/architecture.md](./docs/architecture.md) · 🔐 CI/CD·인증 흐름 → [docs/cicd-and-auth.md](./docs/cicd-and-auth.md) · 🤖 에이전트 작업 가이드 → [CLAUDE.md](./CLAUDE.md)
+> 📐 아키텍처 → [docs/architecture.md](./docs/architecture.md) · 🔐 CI/CD·인증 → [docs/cicd-and-auth.md](./docs/cicd-and-auth.md) · 🔑 시크릿·백업 → [docs/secrets-and-vault-backup.md](./docs/secrets-and-vault-backup.md) · 📝 작업 기록 → [docs/work-log-2026-06.md](./docs/work-log-2026-06.md) · 🤖 에이전트 가이드 → [CLAUDE.md](./CLAUDE.md)
 
 > **네이밍**: 프로젝트 브랜드는 **MOA**다. **EC2·RDS는 `moa-*`** 로 새로 만들었고(보존할 데이터가 없어 깨끗이 재생성), Cloudflare 터널도 `moa-prod`/`moa-dev`다. 반면 **VPC·IAM app role·S3(앱/state 버킷)·CI role(`sw-hub-dev-gha-terraform`)·OIDC는 `sw-hub` 유지** — CI role의 IAM 권한 스코프가 `sw-hub-*`라 IAM까지 moa로 바꾸려면 admin 작업이 필요하고, 그 플러밍은 거의 안 보여서 의도적으로 둔다(혼재는 의도된 부채). 따라서 `moa-prod`/`moa-dev` EC2가 `sw-hub-dev-vpc` 안에 산다.
 
@@ -69,11 +69,11 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 │   ├── environments/dev/ # dev 엔트리포인트 (backend·provider·vars·cloudflare·iam·s3)
 │   └── modules/          # network · ec2 · rds · s3 (재사용 모듈)
 ├── ansible/
-│   ├── inventories/dev/  # hosts.yml, secrets.yml은 terraform apply 시 자동 생성
+│   ├── inventories/dev/  # group_vars/all(정적). 실제 호스트는 cd-ansible가 state에서 런타임 생성
 │   ├── playbooks/        # bootstrap.yml · site.yml
 │   └── roles/            # common · ram_optimization · docker · redis · cloudflared · postgres
-├── docs/                 # architecture.md · cicd-and-auth.md
-└── tools/install-dependencies.sh
+├── docs/                 # architecture · cicd-and-auth · secrets-and-vault-backup · work-log-2026-06
+└── tools/                # install-dependencies.sh · vault-backup.sh
 ```
 
 ---
@@ -104,8 +104,7 @@ dev 머지 → terraform apply 시도 → 'dev-apply' 환경 수동 승인 → a
 - **PR**: playbook 문법 체크만 (서버 접속 없음)
 - **`dev` 머지**: `dev-apply` 승인 → `site.yml --limit dev_app` (dev 박스)
 - **`main` 머지**: `prod-apply` 승인 → `site.yml --limit prod_app` (prod 박스)
-- **환경(Environment) 시크릿** (`dev-apply`/`prod-apply` 각각): `ANSIBLE_SSH_PRIVATE_KEY`(박스 pem), `TF_VAR_CLOUDFLARE_HOSTNAME`(박스 hostname), `CLOUDFLARED_TUNNEL_TOKEN`(박스 터널 토큰)
-- **Repo 시크릿(공유)**: `POSTGRES_RDS_PASSWORD`(공유 RDS master)
+- **시크릿 없음**: 배포 잡이 **OIDC로 AWS를 assume → terraform state(S3)**에서 IP·SSH 키·터널 토큰·RDS 접속정보를 런타임에 읽어 인벤토리·env를 만든다. 환경(`dev-apply`/`prod-apply`)은 *승인 게이트*로만 쓰인다. 상세 → [docs/secrets-and-vault-backup.md](./docs/secrets-and-vault-backup.md)
 
 ---
 
@@ -148,7 +147,7 @@ terraform output -raw rds_tunnel_command  # 노트북→RDS SSH 포트포워딩 
 
 ## 서버 구성 (Ansible)
 
-Ansible은 아직 Terraform CI에 포함되지 않는다(로컬/수동 실행). `ansible/` 디렉토리에서 실행해야 `ansible.cfg` 가 자동 인식된다.
+서버 구성은 CI(`cd-ansible`)가 OIDC/state 기반으로 처리하지만, 로컬에서 직접 돌릴 수도 있다. `ansible/` 디렉토리에서 실행해야 `ansible.cfg` 가 자동 인식된다.
 
 ```bash
 cd ansible

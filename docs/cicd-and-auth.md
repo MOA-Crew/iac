@@ -58,8 +58,7 @@ Terraform GitOps 파이프라인과 전체 인증/자격증명 흐름을 정리�
 | `TF_VAR_CLOUDFLARE_ACCOUNT_ID` | GH Secret | terraform 변수 | 값 |
 | `TF_VAR_CLOUDFLARE_ZONE_NAME` | GH Secret (repo) | terraform 변수 (예: `yeoun.org`) | 값 |
 | `TF_VAR_CLOUDFLARE_HOSTNAME_PROD` / `_DEV` | GH Secret (repo) | terraform 변수 (`moa.yeoun.org` / `dev-moa.yeoun.org`). PR plan이 env 시크릿을 못 읽어 repo로 둠 | 값 |
-| `ANSIBLE_SSH_PRIVATE_KEY` / `CLOUDFLARED_TUNNEL_TOKEN` / `TF_VAR_CLOUDFLARE_HOSTNAME` | GH **Environment** Secret (`dev-apply`·`prod-apply` 각각) | Ansible CD가 박스별로 다른 값 사용 | 시크릿/값 |
-| `POSTGRES_RDS_PASSWORD` | GH Secret (repo) | 공유 RDS master 비밀번호 | 시크릿 |
+| (Ansible CD 시크릿) | **없음** | cd-ansible는 OIDC로 state를 읽어 SSH키·터널토큰·RDS 접속정보를 런타임 취득 → 환경 시크릿 불필요(`dev-apply`/`prod-apply`는 승인 게이트로만). 상세 → [secrets-and-vault-backup.md](./secrets-and-vault-backup.md) | — |
 | Terraform state | S3 `sw-hub-dev-tfstate-<account_id>` (암호화·버전관리·락파일), 키 `dev/terraform.tfstate` | 인프라 상태(민감값 포함) | — |
 | 승인 게이트 | GH Environment `dev-apply`(dev 브랜치)·`prod-apply`(main 브랜치) | apply 전 사람 승인 | — |
 | 로컬 terraform | `~/.aws` 의 IAM 사용자 프로파일 | 로컬 plan/import/부트스트랩 | 액세스 키(개인) |
@@ -107,8 +106,8 @@ CI 파이프라인이 돌기 위해 미리 만들어 둔 것들. (재구축 시 
 3. **CI role** `sw-hub-dev-gha-terraform` (prod/dev 공용):
    - 신뢰정책: 위 OIDC provider, `sub = repo:MOA-Crew/iac:*`(모든 브랜치 → `main`도 assume), `aud = sts.amazonaws.com`.
    - 권한: 인라인 `terraform-dev` (ec2/rds/s3 + `sw-hub-*` 범위 IAM + PassRole(ec2)). **IAM만 `sw-hub-*` 스코프**라 EC2/RDS는 `moa-*` 이름으로도 생성 가능(IAM app role은 sw-hub 유지). moa-* IAM이 필요해지면 이 정책을 admin이 넓혀야 함.
-4. **GitHub Environment** `dev-apply`(브랜치 `dev`) + `prod-apply`(브랜치 `main`): required reviewer 지정. Ansible CD의 박스별 시크릿(SSH 키·hostname·터널 토큰)은 각 Environment에 둔다.
-5. **GH Secrets** 등록 (위 표: repo 공유분 + Environment별 박스 시크릿).
+4. **GitHub Environment** `dev-apply`(브랜치 `dev`) + `prod-apply`(브랜치 `main`): required reviewer 지정 — apply/배포 **승인 게이트**로만 쓴다(환경 시크릿 없음, cd-ansible는 state에서 취득).
+5. **GH Secrets** 등록 (위 표의 repo 공유분 — Cloudflare 5개). Ansible CD는 시크릿 불필요(OIDC/state).
 
 > CI role/OIDC provider는 "CI가 인프라를 만들기 위한 권한"이라, 부트스트랩 단계에서 사람이 생성한다(파이프라인 자체가 자기 권한을 만들지 않음).
 
