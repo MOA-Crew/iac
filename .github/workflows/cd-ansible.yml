@@ -1,0 +1,202 @@
+name: Ansible CD
+
+# PR        → playbook 문법 체크 (서버 접속 없음, 읽기 전용)
+# dev 머지   → dev 박스(dev_app) 구성. GitHub Environment 'dev-apply' 승인 후.
+# main 머지  → prod 박스(prod_app) 구성. GitHub Environment 'prod-apply' 승인 후.
+#
+# 시크릿/인벤토리를 워크플로가 직접 들고 있지 않는다. 배포 잡은 GitHub OIDC로 AWS를
+# assume해 terraform state(S3)를 읽어 **인벤토리 IP·SSH키·터널토큰·RDS 접속정보를
+# 런타임에 생성**한다. → placeholder 인벤토리/환경 시크릿에 의존하지 않고, EC2가
+# 재생성돼 IP가 바뀌어도 drift 없음(state가 단일 소스). 환경(dev-apply/prod-apply)은
+# 값 저장소가 아니라 **승인 게이트**로만 쓴다.
+#   - IP/터널토큰/hostname/RDS = state outputs
+#   - SSH key = state의 tls_private_key 리소스(첫 실행부터 존재 — output 신설 apply를 기다리지 않음)
+
+on:
+  pull_request:
+    paths:
+      - "ansible/**"
+      - ".github/workflows/cd-ansible.yml"
+  push:
+    branches: [dev, main]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/cd-ansible.yml"
+
+permissions:
+  id-token: write # OIDC로 AWS assume (state 읽기)
+  contents: read
+
+env:
+  ANSIBLE_FORCE_COLOR: "1"
+  AWS_REGION: ap-northeast-2
+  AWS_ROLE_ARN: arn:aws:iam::850919911012:role/sw-hub-dev-gha-terraform
+  TF_STATE_S3: s3://sw-hub-dev-tfstate-850919911012/dev/terraform.tfstate
+
+# 박스별로 직렬화(서로 다른 박스끼리는 병렬 허용). 진행 중 배포는 취소하지 않음.
+concurrency:
+  group: ansible-cd-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      - name: Lint inventory graph
+        run: ansible-inventory --graph
+
+      - name: Syntax check playbooks
+        run: |
+          ansible-playbook playbooks/bootstrap.yml --syntax-check
+          ansible-playbook playbooks/site.yml --syntax-check
+
+  deploy-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: dev-apply # ← 수동 승인 게이트
+    env:
+      ENVNAME: dev
+      GROUP: dev_app
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure box from terraform state and run playbook
+        run: |
+          set -euo pipefail
+          STATE="$(mktemp)"
+          KEY_FILE="$RUNNER_TEMP/moa-${ENVNAME}.pem"
+          # 인벤토리는 inventories/dev/ 안에 둬야 그 옆 group_vars/all(base_packages·timezone)이 로드된다.
+          INV="$GITHUB_WORKSPACE/ansible/inventories/dev/runtime.yml"
+          VARS="$RUNNER_TEMP/extra-vars.json"
+          trap 'rm -f "$STATE" "$KEY_FILE" "$INV" "$VARS"' EXIT
+
+          aws s3 cp "$TF_STATE_S3" "$STATE" --quiet
+
+          IP="$(jq -r --arg e "$ENVNAME" '.outputs["ec2_"+$e+"_public_ip"].value' "$STATE")"
+          KEY="$(jq -r --arg e "$ENVNAME" '.resources[]|select(.module==("module.ec2_"+$e) and .type=="tls_private_key")|.instances[0].attributes.private_key_openssh' "$STATE")"
+          TUN="$(jq -r --arg e "$ENVNAME" '.outputs.cloudflare_tunnel_tokens.value[$e]' "$STATE")"
+          HOST="$(jq -r --arg e "$ENVNAME" '.outputs.cloudflare_hostnames.value[$e]' "$STATE")"
+          RDS_EP="$(jq -r '.outputs.rds_endpoint.value' "$STATE")"
+          RDS_PW="$(jq -r '.outputs.rds_password.value' "$STATE")"
+          RDS_HOST="${RDS_EP%:*}"
+          RDS_PORT="${RDS_EP##*:}"
+
+          # 로그 마스킹(터널토큰·DB비번). SSH키는 echo하지 않고 파일로만 떨군다.
+          echo "::add-mask::$TUN"
+          echo "::add-mask::$RDS_PW"
+
+          for v in IP KEY TUN HOST RDS_HOST RDS_PORT RDS_PW; do
+            [ -n "${!v}" ] && [ "${!v}" != "null" ] || { echo "ERROR: state 값 '$v' 비어있음"; exit 1; }
+          done
+
+          install -m 600 /dev/null "$KEY_FILE"
+          printf '%s\n' "$KEY" > "$KEY_FILE"
+
+          # 인벤토리(JSON은 YAML의 부분집합 → .yml 로 두면 ansible yaml 플러그인이 파싱).
+          jq -n --arg g "$GROUP" --arg e "$ENVNAME" --arg ip "$IP" \
+                --arg key "$KEY_FILE" --arg rhost "$RDS_HOST" --argjson rport "$RDS_PORT" \
+            '{all:{vars:{ansible_user:"ubuntu",postgres_rds_host:$rhost,postgres_rds_port:$rport,postgres_rds_user:"moa_admin"},
+              children:{($g):{vars:{ansible_ssh_private_key_file:$key,moa_env:$e,postgres_rds_database:("moa_"+$e)},
+              hosts:{("moa-"+$e):{ansible_host:$ip}}}}}}' > "$INV"
+
+          # 비번은 특수문자 안전하게 JSON 파일로 주입(-e @file).
+          jq -n --arg pw "$RDS_PW" '{postgres_rds_password:$pw}' > "$VARS"
+
+          export MOA_PUBLIC_HOSTNAME="$HOST"
+          export CLOUDFLARED_TUNNEL_TOKEN="$TUN"
+          ansible-playbook playbooks/site.yml -i "$INV" --limit "$GROUP" -e "@$VARS"
+
+  deploy-prod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: prod-apply # ← 수동 승인 게이트 (main 한정)
+    env:
+      ENVNAME: prod
+      GROUP: prod_app
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure box from terraform state and run playbook
+        run: |
+          set -euo pipefail
+          STATE="$(mktemp)"
+          KEY_FILE="$RUNNER_TEMP/moa-${ENVNAME}.pem"
+          # 인벤토리는 inventories/dev/ 안에 둬야 그 옆 group_vars/all(base_packages·timezone)이 로드된다.
+          INV="$GITHUB_WORKSPACE/ansible/inventories/dev/runtime.yml"
+          VARS="$RUNNER_TEMP/extra-vars.json"
+          trap 'rm -f "$STATE" "$KEY_FILE" "$INV" "$VARS"' EXIT
+
+          aws s3 cp "$TF_STATE_S3" "$STATE" --quiet
+
+          IP="$(jq -r --arg e "$ENVNAME" '.outputs["ec2_"+$e+"_public_ip"].value' "$STATE")"
+          KEY="$(jq -r --arg e "$ENVNAME" '.resources[]|select(.module==("module.ec2_"+$e) and .type=="tls_private_key")|.instances[0].attributes.private_key_openssh' "$STATE")"
+          TUN="$(jq -r --arg e "$ENVNAME" '.outputs.cloudflare_tunnel_tokens.value[$e]' "$STATE")"
+          HOST="$(jq -r --arg e "$ENVNAME" '.outputs.cloudflare_hostnames.value[$e]' "$STATE")"
+          RDS_EP="$(jq -r '.outputs.rds_endpoint.value' "$STATE")"
+          RDS_PW="$(jq -r '.outputs.rds_password.value' "$STATE")"
+          RDS_HOST="${RDS_EP%:*}"
+          RDS_PORT="${RDS_EP##*:}"
+
+          echo "::add-mask::$TUN"
+          echo "::add-mask::$RDS_PW"
+
+          for v in IP KEY TUN HOST RDS_HOST RDS_PORT RDS_PW; do
+            [ -n "${!v}" ] && [ "${!v}" != "null" ] || { echo "ERROR: state 값 '$v' 비어있음"; exit 1; }
+          done
+
+          install -m 600 /dev/null "$KEY_FILE"
+          printf '%s\n' "$KEY" > "$KEY_FILE"
+
+          jq -n --arg g "$GROUP" --arg e "$ENVNAME" --arg ip "$IP" \
+                --arg key "$KEY_FILE" --arg rhost "$RDS_HOST" --argjson rport "$RDS_PORT" \
+            '{all:{vars:{ansible_user:"ubuntu",postgres_rds_host:$rhost,postgres_rds_port:$rport,postgres_rds_user:"moa_admin"},
+              children:{($g):{vars:{ansible_ssh_private_key_file:$key,moa_env:$e,postgres_rds_database:("moa_"+$e)},
+              hosts:{("moa-"+$e):{ansible_host:$ip}}}}}}' > "$INV"
+
+          jq -n --arg pw "$RDS_PW" '{postgres_rds_password:$pw}' > "$VARS"
+
+          export MOA_PUBLIC_HOSTNAME="$HOST"
+          export CLOUDFLARED_TUNNEL_TOKEN="$TUN"
+          ansible-playbook playbooks/site.yml -i "$INV" --limit "$GROUP" -e "@$VARS"

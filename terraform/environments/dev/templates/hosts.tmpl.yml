@@ -1,20 +1,33 @@
 # Terraform이 자동 생성. 직접 편집하지 말 것 — 다음 apply에서 덮어써짐.
 # 재생성: terraform apply (in terraform/environments/dev)
+#
+# 두 박스를 prod_app / dev_app 그룹으로 구분한다.
+#   prod_app → moa-prod (moa.yeoun.org, database moa_prod)
+#   dev_app  → moa-dev  (dev-moa.yeoun.org, database moa_dev)
+# 공유 RDS host/port/user 는 all.vars, database/키경로는 그룹별.
 
 all:
   vars:
     ansible_user: ubuntu
-    ansible_ssh_private_key_file: "${private_key_path}"
 
-    # RDS 접속 정보 (비밀번호 제외)
+    # 공유 RDS 접속 정보 (비밀번호 제외)
     postgres_rds_host: ${rds_host}
     postgres_rds_port: ${rds_port}
-    postgres_rds_database: ${rds_database}
     postgres_rds_user: ${rds_user}
   children:
-    app:
+    prod_app:
+      vars:
+        ansible_ssh_private_key_file: "${prod_key}"
+        moa_env: prod
+        postgres_rds_database: moa_prod
       hosts:
-%{ for idx, ip in app_hosts ~}
-        sw-hub-app-${idx + 1}:
-          ansible_host: ${ip}
-%{ endfor ~}
+        moa-prod:
+          ansible_host: ${prod_host}
+    dev_app:
+      vars:
+        ansible_ssh_private_key_file: "${dev_key}"
+        moa_env: dev
+        postgres_rds_database: moa_dev
+      hosts:
+        moa-dev:
+          ansible_host: ${dev_host}

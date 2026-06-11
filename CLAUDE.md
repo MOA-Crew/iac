@@ -7,19 +7,22 @@ Claude Code(또는 다른 코딩 에이전트)가 이 레포에서 작업할 때
 **MOA 서비스의 인프라 코드 저장소.** 한 레포에서 두 책임을 분리 운영한다.
 
 - `terraform/` — 인프라 프로비저닝 (VPC/EC2/RDS/S3/Cloudflare)
-- `ansible/` — 생성된 서버의 OS·런타임 구성 (docker/redis/cloudflared/pgvector 등)
+- `ansible/` — 생성된 서버의 OS·런타임 구성 (docker/cloudflared/pgvector 등). Redis는 BE compose가 앱과 함께 기동(ansible role 아님).
 
 > ⚠️ 이 레포는 **이미 dev 인프라가 실제로 떠서 운영 중**이다. "초기 골조/placeholder" 단계가 아니다. 변경은 운영 중인 리소스에 영향을 줄 수 있으니 신중히 다룬다. 전체 그림은 [README.md](./README.md)와 [docs/architecture.md](./docs/architecture.md)를 먼저 읽을 것.
 
-## 현재 구성 (dev) 요약
+## 현재 구성 (prod + dev) 요약
 
-- **네트워크**: VPC `10.10.0.0/16`, public/private subnet ×2, IGW (private NAT 미사용).
-- **EC2**: `t3.small` 1대, Ubuntu 22.04, IMDSv2 강제. 위에서 `moa-be`·`cloudflared`·`redis` 컨테이너 구동.
-- **RDS**: PostgreSQL, private, EC2 SG에서만 접근, pgvector.
-- **S3**: dev 버킷 (EC2 instance profile 접근).
-- **Cloudflare**: Zero Trust Tunnel + DNS를 Terraform이 관리. 외부 진입은 `https://moa.yeoun.org` 만.
-- **배포**: Terraform GitOps (PR→plan, dev 머지→승인 게이트→apply), CI는 GitHub OIDC.
-- **state**: S3 원격 백엔드 (네이티브 락파일).
+**공유 인프라 위에 앱 박스 2대** 모델. 단일 terraform 스택(`environments/dev/`)이 둘 다 관리한다.
+
+- **네트워크**: 공유 VPC `10.10.0.0/16`(`sw-hub-dev-*`), public/private subnet ×2, IGW (private NAT 미사용).
+- **EC2 2대**: `moa-prod`(t3.small, moa.yeoun.org) + `moa-dev`(t3.micro, dev-moa.yeoun.org). Ubuntu 22.04, IMDSv2 강제. 각 박스에서 `moa-be`·`cloudflared`·`redis` 구동. 박스별 SSH 키.
+- **RDS**: PostgreSQL **인스턴스 1개 공유**(`moa-prod-db`), 내부 database `moa_prod`(prod)·`moa_dev`(dev, Ansible 생성). private, 두 박스 SG에서만 접근, pgvector.
+- **S3**: 앱 버킷 `sw-hub-dev-*` (EC2 instance profile 접근).
+- **Cloudflare**: 환경별 Zero Trust Tunnel + DNS 2벌(`moa-prod`/`moa-dev`)을 Terraform `for_each` 로 관리. 외부 진입 `https://moa.yeoun.org`(prod)·`https://dev-moa.yeoun.org`(dev).
+- **배포**: Terraform GitOps(단일 스택, `dev` 머지→`dev-apply` 승인→apply). Ansible은 브랜치로 박스 선택(`dev`→dev_app/`dev-apply`, `main`→prod_app/`prod-apply`). CI는 GitHub OIDC.
+- **state**: S3 원격 백엔드 `sw-hub-dev-tfstate-*` (단일 키 `dev/terraform.tfstate`, 네이티브 락파일).
+- **네이밍**: EC2·RDS·Cloudflare 터널만 `moa-*`. VPC·IAM·S3·state·CI role은 `sw-hub-*` 유지(혼재는 의도, [네이밍](#네이밍) 참고).
 
 ## 작업 원칙
 
@@ -36,8 +39,9 @@ Claude Code(또는 다른 코딩 에이전트)가 이 레포에서 작업할 때
 - `ignore_changes`(EC2 `ami`, RDS `engine_version`, Cloudflare 터널 `secret`)는 라이브 끊김 방지용 의도된 장치다 — 함부로 제거하지 말 것. 배경은 [docs/cicd-and-auth.md](./docs/cicd-and-auth.md) "드리프트 처리".
 - 리소스 **이름 변경**(예: `project_name` prefix)은 destroy/재생성을 유발한다. 단순 리네이밍처럼 다루지 말 것 — 별도 마이그레이션으로 계획.
 
-### 4. 환경 확장을 염두에 둘 것
-- 지금은 `dev`만 있다. `stage`/`prod` 추가가 쉽도록 모듈/변수 구조를 유지한다.
+### 4. prod/dev 분리 모델 이해
+- prod·dev는 **별도 스택이 아니라** 단일 스택의 앱 박스 2대(`module.ec2_prod`/`module.ec2_dev`) + 공유 RDS의 database 2개로 구현된다. 무거운 자원(VPC/RDS 인스턴스)은 공유.
+- 박스 prefix(`var.app_project_name`=`moa`)와 공유 인프라 prefix(`var.project_name`=`sw-hub`)가 다르다. 새 박스/환경 추가는 `module.ec2_*` 호출과 `cloudflare_edges` 맵, ansible 그룹을 함께 늘린다.
 
 ### 5. 문서는 한국어 중심, 커밋은 영어 컨벤션
 - README 등 핵심 문서는 한국어. 커밋 메시지는 `feat:`/`fix:`/`docs:` 컨벤션 유지.
@@ -52,4 +56,4 @@ Claude Code(또는 다른 코딩 에이전트)가 이 레포에서 작업할 때
 
 ## 네이밍
 
-브랜드는 **MOA**. 일부 AWS 리소스는 초기 SW중심대학 계정 셋업의 `sw-hub`/`swhub` prefix를 유지한다(개명=재생성이라 보류 중). 새 prose/문서는 MOA로 통일한다. 상세는 [README](./README.md)의 네이밍 노트.
+브랜드는 **MOA**. **EC2·RDS·Cloudflare 터널은 `moa-*`**(보존 데이터 없어 새로 생성). **VPC·IAM app role·S3·tfstate 버킷·CI role(`sw-hub-dev-gha-terraform`)·OIDC는 `sw-hub-*` 유지** — CI role IAM 권한이 `sw-hub-*` 스코프라 IAM까지 moa로 바꾸려면 admin 작업 필요, 플러밍이라 의도적으로 둔다. 따라서 `moa-prod`/`moa-dev` EC2가 `sw-hub-dev-vpc` 안에 있는 혼재는 **버그가 아니라 의도**. 상세는 [README](./README.md)의 네이밍 노트.

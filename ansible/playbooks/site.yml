@@ -1,6 +1,6 @@
 ---
 - name: Apply base runtime configuration
-  hosts: app
+  hosts: prod_app:dev_app
   become: true
   gather_facts: true
 
@@ -10,8 +10,6 @@
     - role: awscli
       tags: [awscli]
     - docker
-    - role: redis
-      tags: [cache, redis]
     - role: cloudflared
       tags: [cloudflared, tunnel]
     - role: postgres
