@@ -7,7 +7,7 @@ Claude Code(또는 다른 코딩 에이전트)가 이 레포에서 작업할 때
 **MOA 서비스의 인프라 코드 저장소.** 한 레포에서 두 책임을 분리 운영한다.
 
 - `terraform/` — 인프라 프로비저닝 (VPC/EC2/RDS/S3/Cloudflare)
-- `ansible/` — 생성된 서버의 OS·런타임 구성 (docker/redis/cloudflared/pgvector 등)
+- `ansible/` — 생성된 서버의 OS·런타임 구성 (docker/cloudflared/pgvector 등). Redis는 BE compose가 앱과 함께 기동(ansible role 아님).
 
 > ⚠️ 이 레포는 **이미 dev 인프라가 실제로 떠서 운영 중**이다. "초기 골조/placeholder" 단계가 아니다. 변경은 운영 중인 리소스에 영향을 줄 수 있으니 신중히 다룬다. 전체 그림은 [README.md](./README.md)와 [docs/architecture.md](./docs/architecture.md)를 먼저 읽을 것.
 

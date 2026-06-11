@@ -5,7 +5,7 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 | 도구 | 책임 |
 |---|---|
 | **Terraform** | 인프라 프로비저닝 — VPC / EC2 / RDS / S3 / Cloudflare DNS·Tunnel |
-| **Ansible** | 서버 OS·런타임 구성 — Docker, zram, Redis, cloudflared, pgvector |
+| **Ansible** | 서버 OS·런타임 구성 — Docker, zram, cloudflared, pgvector |
 
 **인프라 변경은 GitOps로 적용한다.** `terraform/**` 를 고쳐 PR을 올리면 CI가 `plan` 을 돌려 PR 코멘트로 보여주고, `dev` 머지 시 수동 승인 게이트를 거쳐 `apply` 된다. 인증은 GitHub OIDC라 **로컬에 AWS/Terraform 키를 둘 필요가 없다.**
 
@@ -33,7 +33,7 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
    │   │  moa-prod (t3.small)          moa-dev (t3.micro)          │ │
    │   │   ├ moa-be :8080               ├ moa-be :8080             │ │
    │   │   ├ cloudflared → moa-prod     ├ cloudflared → moa-dev    │ │
-   │   │   └ redis 127.0.0.1:6379       └ redis 127.0.0.1:6379     │ │
+   │   │   └ redis via BE compose       └ redis via BE compose     │ │
    │   └──────────────┬───────────────────────────┬───────────────┘ │
    │                  │ 두 박스 SG에서만 5432 허용  │                 │
    │   ┌── private subnet ×2 ──────────────────────────────────────┐ │
@@ -52,7 +52,7 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 | **RDS** | PostgreSQL **인스턴스 1개 공유**(`moa-prod-db`), 내부 database `moa_prod`/`moa_dev`. private, 두 박스 SG에서만 접근, gp3 암호화 |
 | **S3** | 앱 버킷 (`sw-hub-dev-*`, EC2 instance profile로 접근) |
 | **Cloudflare** | 환경별 터널·DNS record 2벌(`moa-prod`/`moa-dev`)을 Terraform `for_each` 로 관리 |
-| **Redis** | 박스마다 EC2 내부 Docker Compose (`127.0.0.1:6379`) |
+| **Redis** | 박스마다 **BE compose**가 앱과 함께 기동 (앱과 같은 docker 네트워크, 서비스명 `redis`로 접속, 호스트 포트 비노출) |
 | **Terraform state** | **S3 원격 백엔드** `sw-hub-dev-tfstate-*` (단일 스택, 키 `dev/terraform.tfstate`) |
 
 ---
@@ -71,7 +71,7 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 ├── ansible/
 │   ├── inventories/dev/  # hosts.yml, secrets.yml은 terraform apply 시 자동 생성
 │   ├── playbooks/        # bootstrap.yml · site.yml
-│   └── roles/            # common · ram_optimization · docker · redis · cloudflared · postgres
+│   └── roles/            # common · ram_optimization · docker · cloudflared · postgres
 ├── docs/                 # architecture.md · cicd-and-auth.md
 └── tools/install-dependencies.sh
 ```
@@ -163,11 +163,10 @@ ansible-playbook playbooks/site.yml
 | **common** | 기본 패키지, timezone (Asia/Seoul) |
 | **ram_optimization** | zram-tools + `vm.swappiness` 튜닝 (작은 인스턴스용) |
 | **docker** | Docker CE + Compose plugin, 로그 회전 제한 |
-| **redis** | EC2 내부 Redis Compose (`127.0.0.1:6379`) |
 | **cloudflared** | Cloudflare Tunnel connector Compose |
 | **postgres** | 공유 RDS에 환경 database(moa_prod/moa_dev) 보장 + pgvector 확장 설치 |
 
-박스 선택은 그룹으로: `ansible-playbook playbooks/site.yml --limit dev_app` (또는 `prod_app`). 특정 role만: `... --tags redis`.
+박스 선택은 그룹으로: `ansible-playbook playbooks/site.yml --limit dev_app` (또는 `prod_app`). 특정 role만: `... --tags cloudflared`.
 
 ---
 

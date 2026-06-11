@@ -7,7 +7,7 @@
 - **앱 포트를 인터넷에 직접 열지 않는다.** 외부 진입은 Cloudflare Tunnel(아웃바운드 연결)로만 받는다.
 - **DB는 비공개.** RDS는 private subnet에 두고 두 박스(prod/dev) 보안그룹에서만 접근을 허용한다.
 - **영구 자격증명 최소화.** CI→AWS는 OIDC, EC2→S3는 instance profile로 키를 두지 않는다.
-- **비용 우선.** RDS는 인스턴스 1개를 prod/dev가 database로 나눠 공유. dev 박스는 t3.micro. Redis는 ElastiCache 대신 박스 내부 컨테이너, 단일 AZ, 백업 최소.
+- **비용 우선.** RDS는 인스턴스 1개를 prod/dev가 database로 나눠 공유. dev 박스는 t3.micro. Redis는 ElastiCache 대신 박스 내부 컨테이너(BE compose가 앱과 함께 기동), 단일 AZ, 백업 최소.
 
 ## 전체 그림
 
@@ -26,7 +26,7 @@
  │   │ moa-prod  (t3.small)   │   │ moa-dev  (t3.micro)    │    │
  │   │  ├ moa-be :8080        │   │  ├ moa-be :8080        │    │
  │   │  ├ cloudflared→moa-prod│   │  ├ cloudflared→moa-dev │    │
- │   │  └ redis 127.0.0.1     │   │  └ redis 127.0.0.1     │    │
+ │   │  └ redis (compose)     │   │  └ redis (compose)     │    │
  │   └───────────┬────────────┘   └───────────┬────────────┘    │
  │               │  5432: 두 박스 SG에서만 허용  │                 │
  │   private subnet ×2 (10.10.11.0/24, 10.10.12.0/24)           │
@@ -69,7 +69,7 @@
 
 ## 서버 런타임 (Ansible)
 
-`terraform apply` 가 만든 두 박스 위에 런타임을 구성한다. 인벤토리는 `prod_app`/`dev_app` 그룹으로 나뉘고, role(`common`, `ram_optimization`(zram), `docker`, `redis`, `cloudflared`, `postgres`)은 그룹 vars(database·hostname·키)만 달리해 공용으로 돈다.
+`terraform apply` 가 만든 두 박스 위에 런타임을 구성한다. 인벤토리는 `prod_app`/`dev_app` 그룹으로 나뉘고, role(`common`, `ram_optimization`(zram), `docker`, `cloudflared`, `postgres`)은 그룹 vars(database·hostname·키)만 달리해 공용으로 돈다. (Redis는 ansible이 아니라 BE compose가 앱과 함께 기동.)
 
 ## 배포 / 인증
 
