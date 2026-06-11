@@ -16,9 +16,24 @@
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
 
+# 공유 RDS 인스턴스에 이 박스(환경)의 database 를 보장한다.
+# prod 박스(moa_prod)는 RDS 초기 생성분이라 멱등 no-op, dev 박스(moa_dev)는 신규 생성.
+# postgresql_db 는 master(moa_admin)로 접속해 생성하므로 maintenance_db=postgres 사용.
+- name: Ensure environment database exists on RDS
+  community.postgresql.postgresql_db:
+    name: "{{ postgres_rds_database }}"
+    login_host: "{{ postgres_rds_host }}"
+    login_port: "{{ postgres_rds_port }}"
+    login_user: "{{ postgres_rds_user }}"
+    login_password: "{{ postgres_rds_password }}"
+    maintenance_db: postgres
+    state: present
+  run_once: true
+  no_log: true
+
 # postgresql_ext 모듈은 target host(=EC2)에서 RDS로 접속한다.
 # EC2 ↔ RDS 는 SG로 허용돼 있으므로 그대로 동작.
-# 여러 app 노드가 있어도 한 번만 돌리면 충분해서 run_once 사용.
+# 환경별 database(moa_prod/moa_dev)에 extension 활성화. run_once 로 한 번만.
 - name: Enable PostgreSQL extensions on RDS
   community.postgresql.postgresql_ext:
     name: "{{ item }}"
