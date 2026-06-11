@@ -92,7 +92,8 @@ jobs:
           set -euo pipefail
           STATE="$(mktemp)"
           KEY_FILE="$RUNNER_TEMP/moa-${ENVNAME}.pem"
-          INV="$RUNNER_TEMP/inventory.yml"
+          # 인벤토리는 inventories/dev/ 안에 둬야 그 옆 group_vars/all(base_packages·timezone)이 로드된다.
+          INV="$GITHUB_WORKSPACE/ansible/inventories/dev/runtime.yml"
           VARS="$RUNNER_TEMP/extra-vars.json"
           trap 'rm -f "$STATE" "$KEY_FILE" "$INV" "$VARS"' EXIT
 
@@ -162,7 +163,8 @@ jobs:
           set -euo pipefail
           STATE="$(mktemp)"
           KEY_FILE="$RUNNER_TEMP/moa-${ENVNAME}.pem"
-          INV="$RUNNER_TEMP/inventory.yml"
+          # 인벤토리는 inventories/dev/ 안에 둬야 그 옆 group_vars/all(base_packages·timezone)이 로드된다.
+          INV="$GITHUB_WORKSPACE/ansible/inventories/dev/runtime.yml"
           VARS="$RUNNER_TEMP/extra-vars.json"
           trap 'rm -f "$STATE" "$KEY_FILE" "$INV" "$VARS"' EXIT
 
