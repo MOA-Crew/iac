@@ -17,6 +17,12 @@ output "private_key_path" {
   value       = abspath(local_sensitive_file.private_key.filename)
 }
 
+output "private_key" {
+  description = "생성된 SSH private key (OpenSSH 포맷). state·output 모두 sensitive — `terraform output -raw`로 직접 조회용."
+  value       = tls_private_key.this.private_key_openssh
+  sensitive   = true
+}
+
 # Ansible inventory 에 박을 키 경로.
 # - 상대경로 입력이면 inventory_dir 기준 Jinja 표현으로 변환 → 어디서 ansible 명령을 실행해도 안 깨짐.
 # - 절대경로(~ 포함) 입력이면 그대로 절대경로 사용.
