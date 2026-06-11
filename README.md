@@ -11,47 +11,49 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 
 > 📐 아키텍처 상세 → [docs/architecture.md](./docs/architecture.md) · 🔐 CI/CD·인증 흐름 → [docs/cicd-and-auth.md](./docs/cicd-and-auth.md) · 🤖 에이전트 작업 가이드 → [CLAUDE.md](./CLAUDE.md)
 
-> **네이밍**: 프로젝트 브랜드는 **MOA**다. 다만 일부 AWS 리소스는 초기 SW중심대학 계정 셋업 때 굳은 `sw-hub` / `swhub` prefix를 그대로 쓴다(state 버킷·IAM role·RDS db/user 등 — 운영 중이라 개명하려면 재생성이 필요). 앱·Cloudflare 레이어는 `moa`. AWS 리소스 prefix의 `moa` 통일은 별도 마이그레이션 작업으로 분리한다.
+> **네이밍**: 프로젝트 브랜드는 **MOA**다. **EC2·RDS는 `moa-*`** 로 새로 만들었고(보존할 데이터가 없어 깨끗이 재생성), Cloudflare 터널도 `moa-prod`/`moa-dev`다. 반면 **VPC·IAM app role·S3(앱/state 버킷)·CI role(`sw-hub-dev-gha-terraform`)·OIDC는 `sw-hub` 유지** — CI role의 IAM 권한 스코프가 `sw-hub-*`라 IAM까지 moa로 바꾸려면 admin 작업이 필요하고, 그 플러밍은 거의 안 보여서 의도적으로 둔다(혼재는 의도된 부채). 따라서 `moa-prod`/`moa-dev` EC2가 `sw-hub-dev-vpc` 안에 산다.
 
 ---
 
-## 아키텍처 (dev)
+## 아키텍처 (prod + dev)
 
-외부 트래픽은 EC2 포트로 직접 들어오지 않는다. 전부 **Cloudflare Tunnel** 을 통해 들어오고, EC2는 인바운드 앱 포트를 열지 않는다.
+**공유 인프라(VPC·RDS 인스턴스·S3·IAM) 위에 앱 박스 2대**를 둔다. 무거운 stateful 자원은 공유해 비용을 아끼고, 환경은 박스·database·터널·도메인으로 분리한다. 외부 트래픽은 EC2 포트로 직접 들어오지 않고 전부 **Cloudflare Tunnel** 을 통한다.
 
 ```text
-                 인터넷
-                   │ https://moa.yeoun.org
-                   ▼
-          ┌─────────────────┐
-          │  Cloudflare      │  엣지 TLS + Zero Trust Tunnel
-          └────────┬────────┘
-                   │ (아웃바운드 터널 연결, 인바운드 개방 없음)
-   ┌───────────────┼──────────────────────────────────┐
-   │ VPC 10.10.0.0/16                                  │
-   │   ┌──────────────── public subnet ×2 ──────────┐ │
-   │   │  EC2 (t3.small, Ubuntu 22.04, IMDSv2)       │ │
-   │   │   ├ moa-be (Docker)        :8080            │ │
-   │   │   ├ cloudflared (Docker)   → 터널 connector │ │
-   │   │   └ redis (Docker)         127.0.0.1:6379   │ │
-   │   └───────────────────┬─────────────────────────┘ │
-   │                       │ EC2 SG에서만 5432 허용      │
-   │   ┌──────────── private subnet ×2 ─────────────┐  │
-   │   │  RDS PostgreSQL (비공개, 암호화, pgvector)  │  │
-   │   └─────────────────────────────────────────────┘  │
-   └────────────────────────────────────────────────────┘
+        인터넷
+          │  https://moa.yeoun.org        https://dev-moa.yeoun.org
+          ▼                                          ▼
+   ┌──────────────┐                          ┌──────────────┐
+   │  Cloudflare  │  터널 moa-prod            │  Cloudflare  │  터널 moa-dev
+   └──────┬───────┘                          └──────┬───────┘
+          │ (아웃바운드 터널, 인바운드 개방 없음)        │
+   ┌──────┼─────────────────────────────────────────┼──────────────┐
+   │ VPC sw-hub-dev-vpc 10.10.0.0/16                 │              │
+   │   ┌── public subnet ×2 ──────────────────────────────────────┐ │
+   │   │  moa-prod (t3.small)          moa-dev (t3.micro)          │ │
+   │   │   ├ moa-be :8080               ├ moa-be :8080             │ │
+   │   │   ├ cloudflared → moa-prod     ├ cloudflared → moa-dev    │ │
+   │   │   └ redis 127.0.0.1:6379       └ redis 127.0.0.1:6379     │ │
+   │   └──────────────┬───────────────────────────┬───────────────┘ │
+   │                  │ 두 박스 SG에서만 5432 허용  │                 │
+   │   ┌── private subnet ×2 ──────────────────────────────────────┐ │
+   │   │  RDS PostgreSQL  moa-prod-db (공유)                        │ │
+   │   │    ├ database moa_prod  (prod)                            │ │
+   │   │    └ database moa_dev   (dev)                             │ │
+   │   └────────────────────────────────────────────────────────────┘ │
+   └────────────────────────────────────────────────────────────────┘
         EC2 → S3 : instance profile (키 없음)
 ```
 
 | 구성요소 | 내용 |
 |---|---|
-| **네트워크** | VPC `10.10.0.0/16`, public ×2 / private ×2 subnet, IGW (private는 NAT 미사용) |
-| **EC2** | `t3.small` 1대, Ubuntu 22.04, **IMDSv2 강제**, SSH 키 Terraform 자동 생성, S3용 instance profile |
-| **RDS** | PostgreSQL, private subnet, **EC2 SG에서만 접근**, gp3 암호화, 비공개(`publicly_accessible=false`) |
-| **S3** | dev용 버킷 (EC2 instance profile로 접근) |
-| **Cloudflare** | DNS record + Zero Trust Tunnel을 Terraform으로 관리, ingress → `localhost:8080` |
-| **Redis** | 비용 절감 위해 ElastiCache 대신 EC2 내부 Docker Compose (`127.0.0.1:6379`) |
-| **Terraform state** | **S3 원격 백엔드** (버전관리·암호화·퍼블릭 차단, S3 네이티브 락파일). 로컬 state 아님 |
+| **네트워크** | 공유 VPC `10.10.0.0/16`(`sw-hub-dev-*`), public ×2 / private ×2 subnet, IGW |
+| **EC2** | `moa-prod`(t3.small, moa.yeoun.org) + `moa-dev`(t3.micro, dev-moa.yeoun.org). Ubuntu 22.04, **IMDSv2 강제**, 박스별 SSH 키, S3용 instance profile(공유 sw-hub) |
+| **RDS** | PostgreSQL **인스턴스 1개 공유**(`moa-prod-db`), 내부 database `moa_prod`/`moa_dev`. private, 두 박스 SG에서만 접근, gp3 암호화 |
+| **S3** | 앱 버킷 (`sw-hub-dev-*`, EC2 instance profile로 접근) |
+| **Cloudflare** | 환경별 터널·DNS record 2벌(`moa-prod`/`moa-dev`)을 Terraform `for_each` 로 관리 |
+| **Redis** | 박스마다 EC2 내부 Docker Compose (`127.0.0.1:6379`) |
+| **Terraform state** | **S3 원격 백엔드** `sw-hub-dev-tfstate-*` (단일 스택, 키 `dev/terraform.tfstate`) |
 
 ---
 
@@ -60,7 +62,8 @@ MOA 서비스의 인프라를 코드로 관리하는 모노레포다. 역할을 
 ```text
 .
 ├── .github/workflows/
-│   ├── terraform.yml     # GitOps: PR→plan, dev 머지→apply(승인 게이트)
+│   ├── cd-terraform.yml  # GitOps: PR→plan, dev 머지→apply(승인 게이트)
+│   ├── cd-ansible.yml    # Ansible CD: PR→syntax check, dev 머지→site.yml 실행(승인 게이트)
 │   └── validate.yml      # fmt/validate 검증
 ├── terraform/
 │   ├── environments/dev/ # dev 엔트리포인트 (backend·provider·vars·cloudflare·iam·s3)
@@ -88,11 +91,21 @@ dev 머지 → terraform apply 시도 → 'dev-apply' 환경 수동 승인 → a
 ```
 
 - **인증**: GitHub OIDC → IAM role (저장된 액세스 키 없음)
-- **트리거**: `terraform/**`, `.github/workflows/terraform.yml` 변경 시
-- **필요한 Repo Secrets**: `CLOUDFLARE_API_TOKEN`, `TF_VAR_CLOUDFLARE_ACCOUNT_ID`, `TF_VAR_CLOUDFLARE_ZONE_NAME`, `TF_VAR_CLOUDFLARE_HOSTNAME`
+- **트리거**: `terraform/**`, `.github/workflows/cd-terraform.yml` 변경 시. 단일 스택이라 `dev` 머지→`dev-apply` 승인→apply.
+- **필요한 Repo Secrets**: `CLOUDFLARE_API_TOKEN`, `TF_VAR_CLOUDFLARE_ACCOUNT_ID`, `TF_VAR_CLOUDFLARE_ZONE_NAME`, `TF_VAR_CLOUDFLARE_HOSTNAME_PROD`(moa.yeoun.org), `TF_VAR_CLOUDFLARE_HOSTNAME_DEV`(dev-moa.yeoun.org)
 - ⚠️ PR에 **머지 충돌**이 있으면 GitHub가 merge ref를 못 만들어 워크플로가 트리거되지 않는다. 충돌부터 해소할 것.
 
 > 일상 작업은 **PR → plan 확인 → 머지 → 승인** 이게 전부다. 흐름·자격증명 위치 상세는 [docs/cicd-and-auth.md](./docs/cicd-and-auth.md).
+
+### 서버 구성 변경 — Ansible CD
+
+`ansible/**` 수정도 같은 GitOps 흐름을 탄다 (`.github/workflows/cd-ansible.yml`). 박스가 둘이라 브랜치로 대상을 가른다.
+
+- **PR**: playbook 문법 체크만 (서버 접속 없음)
+- **`dev` 머지**: `dev-apply` 승인 → `site.yml --limit dev_app` (dev 박스)
+- **`main` 머지**: `prod-apply` 승인 → `site.yml --limit prod_app` (prod 박스)
+- **환경(Environment) 시크릿** (`dev-apply`/`prod-apply` 각각): `ANSIBLE_SSH_PRIVATE_KEY`(박스 pem), `TF_VAR_CLOUDFLARE_HOSTNAME`(박스 hostname), `CLOUDFLARED_TUNNEL_TOKEN`(박스 터널 토큰)
+- **Repo 시크릿(공유)**: `POSTGRES_RDS_PASSWORD`(공유 RDS master)
 
 ---
 
@@ -112,7 +125,8 @@ aws configure
 export CLOUDFLARE_API_TOKEN=...
 export TF_VAR_cloudflare_account_id=...
 export TF_VAR_cloudflare_zone_name=...
-export TF_VAR_cloudflare_hostname=...
+export TF_VAR_cloudflare_hostname_prod=...   # moa.yeoun.org
+export TF_VAR_cloudflare_hostname_dev=...    # dev-moa.yeoun.org
 
 # 4. plan
 cd terraform/environments/dev
@@ -151,9 +165,9 @@ ansible-playbook playbooks/site.yml
 | **docker** | Docker CE + Compose plugin, 로그 회전 제한 |
 | **redis** | EC2 내부 Redis Compose (`127.0.0.1:6379`) |
 | **cloudflared** | Cloudflare Tunnel connector Compose |
-| **postgres** | RDS에 pgvector 확장 설치 |
+| **postgres** | 공유 RDS에 환경 database(moa_prod/moa_dev) 보장 + pgvector 확장 설치 |
 
-특정 role만 실행: `ansible-playbook playbooks/site.yml --tags redis`
+박스 선택은 그룹으로: `ansible-playbook playbooks/site.yml --limit dev_app` (또는 `prod_app`). 특정 role만: `... --tags redis`.
 
 ---
 
