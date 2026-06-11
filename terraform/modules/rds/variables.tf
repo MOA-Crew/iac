@@ -48,9 +48,9 @@ variable "port" {
   default     = 5432
 }
 
-variable "app_security_group_id" {
-  description = "이 RDS에 접근 허용할 앱(EC2) 보안그룹 ID."
-  type        = string
+variable "app_security_group_ids" {
+  description = "이 RDS에 접근 허용할 앱(EC2) 보안그룹 ID 목록. 여러 박스(prod/dev)가 한 RDS를 공유할 때 각 SG를 모두 넣는다."
+  type        = list(string)
 }
 
 variable "network_summary" {

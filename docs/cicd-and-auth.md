@@ -1,6 +1,8 @@
-# CI/CD & 인증 흐름 (dev)
+# CI/CD & 인증 흐름 (prod + dev)
 
 Terraform GitOps 파이프라인과 전체 인증/자격증명 흐름을 정리한 문서.
+
+> 모델: 단일 terraform 스택이 공유 인프라 + 앱 박스 2대(moa-prod/moa-dev)를 관리. Terraform CD는 `dev` 머지→`dev-apply`. Ansible CD는 브랜치로 박스 선택(`dev`→dev_app/`dev-apply`, `main`→prod_app/`prod-apply`). 공유 CI role `sw-hub-dev-gha-terraform`(OIDC trust=`repo:MOA-Crew/iac:*`)·state 버킷을 양쪽이 쓴다.
 
 핵심 원칙: **인프라 배포 경로(CI → AWS)에 영구 액세스 키가 0개.** GitHub ↔ AWS 신뢰관계(OIDC)로 매 실행마다 단기 토큰을 발급받는다.
 
@@ -41,7 +43,7 @@ Terraform GitOps 파이프라인과 전체 인증/자격증명 흐름을 정리�
 ### 워크플로 트리거
 - **PR (`pull_request`)**: `terraform plan` → 결과를 PR 코멘트. (읽기/계획만)
 - **dev 머지 (`push: dev`)**: `terraform apply` → `dev-apply` 환경 승인 후 실행.
-- 경로 필터: `terraform/**`, `.github/workflows/terraform.yml` 변경 시에만 동작.
+- 경로 필터: `terraform/**`, `.github/workflows/cd-terraform.yml` 변경 시에만 동작.
 - ⚠️ PR에 머지 충돌이 있으면 GitHub이 merge ref를 못 만들어 **워크플로 자체가 트리거되지 않는다.** 충돌부터 해소할 것.
 
 ---
@@ -54,10 +56,12 @@ Terraform GitOps 파이프라인과 전체 인증/자격증명 흐름을 정리�
 | CI role 권한 | IAM role `sw-hub-dev-gha-terraform` 인라인정책 `terraform-dev` | terraform 권한 범위 | 스코프(ec2/rds/s3 + iam은 `sw-hub-*`) |
 | `CLOUDFLARE_API_TOKEN` | GH Secret (이 레포) | cloudflare provider | 시크릿 |
 | `TF_VAR_CLOUDFLARE_ACCOUNT_ID` | GH Secret | terraform 변수 | 값 |
-| `TF_VAR_CLOUDFLARE_ZONE_NAME` | GH Secret | terraform 변수 (예: `yeoun.org`) | 값 |
-| `TF_VAR_CLOUDFLARE_HOSTNAME` | GH Secret | terraform 변수 (예: `moa.yeoun.org`) | 값 |
-| Terraform state | S3 `sw-hub-dev-tfstate-<account_id>` (암호화·버전관리·락파일) | 인프라 상태(민감값 포함) | — |
-| 승인 게이트 | GH Environment `dev-apply` (reviewer 지정, dev 브랜치만) | apply 전 사람 승인 | — |
+| `TF_VAR_CLOUDFLARE_ZONE_NAME` | GH Secret (repo) | terraform 변수 (예: `yeoun.org`) | 값 |
+| `TF_VAR_CLOUDFLARE_HOSTNAME_PROD` / `_DEV` | GH Secret (repo) | terraform 변수 (`moa.yeoun.org` / `dev-moa.yeoun.org`). PR plan이 env 시크릿을 못 읽어 repo로 둠 | 값 |
+| `ANSIBLE_SSH_PRIVATE_KEY` / `CLOUDFLARED_TUNNEL_TOKEN` / `TF_VAR_CLOUDFLARE_HOSTNAME` | GH **Environment** Secret (`dev-apply`·`prod-apply` 각각) | Ansible CD가 박스별로 다른 값 사용 | 시크릿/값 |
+| `POSTGRES_RDS_PASSWORD` | GH Secret (repo) | 공유 RDS master 비밀번호 | 시크릿 |
+| Terraform state | S3 `sw-hub-dev-tfstate-<account_id>` (암호화·버전관리·락파일), 키 `dev/terraform.tfstate` | 인프라 상태(민감값 포함) | — |
+| 승인 게이트 | GH Environment `dev-apply`(dev 브랜치)·`prod-apply`(main 브랜치) | apply 전 사람 승인 | — |
 | 로컬 terraform | `~/.aws` 의 IAM 사용자 프로파일 | 로컬 plan/import/부트스트랩 | 액세스 키(개인) |
 
 > state 백엔드는 `terraform/environments/dev/backend.tf`. 잠금은 S3 네이티브 락파일(`use_lockfile`) — DynamoDB 불필요.
@@ -68,16 +72,18 @@ Terraform GitOps 파이프라인과 전체 인증/자격증명 흐름을 정리�
 
 앱(BE) 배포와 런타임은 인프라 파이프라인과 분리되어 있다.
 
+박스가 둘(moa-prod/moa-dev)이라 BE CD도 브랜치별로 대상 박스·database를 달리해야 한다.
+
 ```
-[MOA-Crew/BE dev 머지] → BE CI(jar) → BE CD(cd.yml)
-    │  EC2_SSH_PRIVATE_KEY (BE repo GH Secret)로 SSH
+[MOA-Crew/BE 머지] → BE CI(jar) → BE CD(cd.yml)
+    │  SSH 키(BE repo GH Secret)로 대상 박스 접속  (dev 머지→moa-dev, main→moa-prod)
     ▼
-[EC2] docker run moa-be
-    ├─ RDS 접속    : LOCAL_POSTGRES_* (BE repo GH Secret) → /opt/moa/be/moa-be.env (600 root)
+[박스] docker run moa-be
+    ├─ RDS 접속    : 공유 RDS, database = moa_prod(prod) / moa_dev(dev) → /opt/moa/be/moa-be.env (600 root)
     ├─ S3 접근     : EC2 instance profile(sw-hub-dev-app-role) — 키 없음
     ├─ IMDSv2 강제 : 토큰 없는 메타데이터 접근 차단(SSRF 방어)
-    └─ cloudflared : 터널 토큰(계정/터널ID/secret 내장)으로 Cloudflare에 아웃바운드 연결
-                     → 외부는 https://moa.yeoun.org (Cloudflare 엣지 TLS)
+    └─ cloudflared : 박스 터널 토큰으로 Cloudflare에 아웃바운드 연결
+                     → 외부는 https://moa.yeoun.org(prod) / https://dev-moa.yeoun.org(dev)
 ```
 
 | 경로 | 인증 수단 | 영구 키 |
@@ -98,11 +104,11 @@ CI 파이프라인이 돌기 위해 미리 만들어 둔 것들. (재구축 시 
 
 1. **S3 state 버킷**: `sw-hub-dev-tfstate-<account_id>` (버전관리/SSE/퍼블릭 차단) + 로컬 state를 S3로 마이그레이션.
 2. **GitHub OIDC provider**: `token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
-3. **CI role** `sw-hub-dev-gha-terraform`:
-   - 신뢰정책: 위 OIDC provider, `sub = repo:MOA-Crew/iac:*`, `aud = sts.amazonaws.com`.
-   - 권한: 인라인 `terraform-dev` (ec2/rds/s3 + `sw-hub-*` 범위 IAM + PassRole(ec2)).
-4. **GitHub Environment** `dev-apply`: required reviewer 지정, 배포 브랜치 `dev`로 제한.
-5. **GH Secrets 4개** 등록 (위 표).
+3. **CI role** `sw-hub-dev-gha-terraform` (prod/dev 공용):
+   - 신뢰정책: 위 OIDC provider, `sub = repo:MOA-Crew/iac:*`(모든 브랜치 → `main`도 assume), `aud = sts.amazonaws.com`.
+   - 권한: 인라인 `terraform-dev` (ec2/rds/s3 + `sw-hub-*` 범위 IAM + PassRole(ec2)). **IAM만 `sw-hub-*` 스코프**라 EC2/RDS는 `moa-*` 이름으로도 생성 가능(IAM app role은 sw-hub 유지). moa-* IAM이 필요해지면 이 정책을 admin이 넓혀야 함.
+4. **GitHub Environment** `dev-apply`(브랜치 `dev`) + `prod-apply`(브랜치 `main`): required reviewer 지정. Ansible CD의 박스별 시크릿(SSH 키·hostname·터널 토큰)은 각 Environment에 둔다.
+5. **GH Secrets** 등록 (위 표: repo 공유분 + Environment별 박스 시크릿).
 
 > CI role/OIDC provider는 "CI가 인프라를 만들기 위한 권한"이라, 부트스트랩 단계에서 사람이 생성한다(파이프라인 자체가 자기 권한을 만들지 않음).
 

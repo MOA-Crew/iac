@@ -8,11 +8,11 @@ postgres_packages:
   - postgresql-client
   - python3-psycopg2
 
-# RDS 접속 정보. 값은 inventory / -e / vault 로 외부에서 주입.
-# 기본값은 host/password 외엔 우리 dev 설정과 동일.
+# RDS 접속 정보. 값은 inventory(그룹별 database) / -e / vault 로 외부에서 주입.
+# database 는 환경별(moa_prod/moa_dev)이라 인벤토리 그룹 vars 가 덮어쓴다. 여기 기본값은 fallback.
 postgres_rds_port: 5432
-postgres_rds_database: swhub
-postgres_rds_user: swhub_admin
+postgres_rds_database: moa_prod
+postgres_rds_user: moa_admin
 
 # 활성화할 PostgreSQL extension 목록. 필요해지면 여기에 추가.
 postgres_extensions:
