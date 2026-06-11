@@ -33,6 +33,18 @@ output "ec2_dev_private_key_path" {
   value       = module.ec2_dev.private_key_path
 }
 
+output "ec2_prod_private_key" {
+  description = "moa-prod SSH private key (OpenSSH, sensitive). terraform output -raw ec2_prod_private_key 로 조회."
+  value       = module.ec2_prod.private_key
+  sensitive   = true
+}
+
+output "ec2_dev_private_key" {
+  description = "moa-dev SSH private key (OpenSSH, sensitive). terraform output -raw ec2_dev_private_key 로 조회."
+  value       = module.ec2_dev.private_key
+  sensitive   = true
+}
+
 output "rds_summary" {
   description = "공유 RDS(moa-db) 요약."
   value       = module.rds.summary
