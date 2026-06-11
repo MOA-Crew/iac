@@ -7,15 +7,14 @@
 # 도메인/호스트명도 환경변수로 주입하는 것을 기본으로 한다:
 # export TF_VAR_cloudflare_account_id=...
 # export TF_VAR_cloudflare_zone_name=...
-# export TF_VAR_cloudflare_hostname=...
+# export TF_VAR_cloudflare_hostname_prod=...   # 예: moa.yeoun.org
+# export TF_VAR_cloudflare_hostname_dev=...    # 예: dev-moa.yeoun.org
 
 # terraform.tfvars를 쓸 때도 실제 도메인을 하드코딩하지 말고 환경별 파일로 분리한다.
-cloudflare_account_id     = "replace-with-cloudflare-account-id"
-cloudflare_zone_name      = "replace-with-zone-name"
-cloudflare_hostname       = "replace-with-public-hostname"
-cloudflare_tunnel_name    = "moa-dev"
-cloudflare_origin_service = "http://localhost:8080"
+cloudflare_account_id    = "replace-with-cloudflare-account-id"
+cloudflare_zone_name     = "replace-with-zone-name"
+cloudflare_hostname_prod = "replace-with-prod-hostname" # moa.yeoun.org
+cloudflare_hostname_dev  = "replace-with-dev-hostname"  # dev-moa.yeoun.org
 
-# 선택: 기존 tunnel secret을 직접 관리해야 할 때만 사용.
-# 기본값 null이면 Terraform이 random_id로 생성한다.
-# cloudflare_tunnel_secret = "..."
+# 터널 이름은 cloudflare.tf 가 app_project_name 으로 자동 생성(moa-prod / moa-dev).
+cloudflare_origin_service = "http://localhost:8080"
