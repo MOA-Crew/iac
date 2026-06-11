@@ -28,11 +28,11 @@ resource "aws_security_group" "this" {
   vpc_id      = var.network_summary.vpc_id
 
   ingress {
-    description     = "DB port from app SG"
+    description     = "DB port from app SG(s)"
     from_port       = var.port
     to_port         = var.port
     protocol        = "tcp"
-    security_groups = [var.app_security_group_id]
+    security_groups = var.app_security_group_ids
   }
 
   egress {
