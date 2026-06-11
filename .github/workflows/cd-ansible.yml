@@ -1,0 +1,134 @@
+name: Ansible CD
+
+# PR        → playbook 문법 체크 (서버 접속 없음, 읽기 전용)
+# dev 머지   → dev 박스(dev_app) 구성. GitHub Environment 'dev-apply' 승인 후.
+# main 머지  → prod 박스(prod_app) 구성. GitHub Environment 'prod-apply' 승인 후.
+#
+# 환경(Environment) 시크릿 — dev-apply / prod-apply 에 각각:
+#   ANSIBLE_SSH_PRIVATE_KEY     — 해당 박스 SSH key (dev=moa-dev.pem, prod=moa-prod.pem)
+#   TF_VAR_CLOUDFLARE_HOSTNAME  — 해당 박스 공개 hostname → MOA_PUBLIC_HOSTNAME
+#   CLOUDFLARED_TUNNEL_TOKEN    — 해당 박스 터널 토큰
+# Repo 시크릿(공유):
+#   POSTGRES_RDS_PASSWORD       — 공유 RDS master 비밀번호
+
+on:
+  pull_request:
+    paths:
+      - "ansible/**"
+      - ".github/workflows/cd-ansible.yml"
+  push:
+    branches: [dev, main]
+    paths:
+      - "ansible/**"
+      - ".github/workflows/cd-ansible.yml"
+
+permissions:
+  contents: read
+
+env:
+  ANSIBLE_FORCE_COLOR: "1"
+
+# 박스별로 직렬화(서로 다른 박스끼리는 병렬 허용). 진행 중 배포는 취소하지 않음.
+concurrency:
+  group: ansible-cd-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      - name: Lint inventory graph
+        run: ansible-inventory --graph
+
+      - name: Syntax check playbooks
+        run: |
+          ansible-playbook playbooks/bootstrap.yml --syntax-check
+          ansible-playbook playbooks/site.yml --syntax-check
+
+  deploy-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: dev-apply
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      # inventory(dev_app)가 repo root의 moa-dev.pem 을 참조하므로 같은 경로에 떨군다.
+      - name: Write SSH private key
+        run: |
+          install -m 600 /dev/null ../moa-dev.pem
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ../moa-dev.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+
+      - name: Run site playbook (dev_app)
+        env:
+          MOA_PUBLIC_HOSTNAME: ${{ secrets.TF_VAR_CLOUDFLARE_HOSTNAME }}
+          CLOUDFLARED_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARED_TUNNEL_TOKEN }}
+          POSTGRES_RDS_PASSWORD: ${{ secrets.POSTGRES_RDS_PASSWORD }}
+        run: |
+          ansible-playbook playbooks/site.yml \
+            --limit dev_app \
+            -e "postgres_rds_password=$POSTGRES_RDS_PASSWORD"
+
+      - name: Remove SSH private key
+        if: always()
+        run: rm -f ../moa-dev.pem
+
+  deploy-prod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: prod-apply
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+          ansible-galaxy collection install community.general community.postgresql
+
+      # inventory(prod_app)가 repo root의 moa-prod.pem 을 참조하므로 같은 경로에 떨군다.
+      - name: Write SSH private key
+        run: |
+          install -m 600 /dev/null ../moa-prod.pem
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ../moa-prod.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+
+      - name: Run site playbook (prod_app)
+        env:
+          MOA_PUBLIC_HOSTNAME: ${{ secrets.TF_VAR_CLOUDFLARE_HOSTNAME }}
+          CLOUDFLARED_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARED_TUNNEL_TOKEN }}
+          POSTGRES_RDS_PASSWORD: ${{ secrets.POSTGRES_RDS_PASSWORD }}
+        run: |
+          ansible-playbook playbooks/site.yml \
+            --limit prod_app \
+            -e "postgres_rds_password=$POSTGRES_RDS_PASSWORD"
+
+      - name: Remove SSH private key
+        if: always()
+        run: rm -f ../moa-prod.pem
