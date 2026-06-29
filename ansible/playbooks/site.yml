@@ -14,3 +14,5 @@
       tags: [cloudflared, tunnel]
     - role: postgres
       tags: [db, postgres]
+    - role: promtail
+      tags: [promtail, monitoring]

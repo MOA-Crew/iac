@@ -61,6 +61,7 @@ jobs:
         run: |
           ansible-playbook playbooks/bootstrap.yml --syntax-check
           ansible-playbook playbooks/site.yml --syntax-check
+          ansible-playbook playbooks/monitoring.yml --syntax-check
 
   deploy-dev:
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'

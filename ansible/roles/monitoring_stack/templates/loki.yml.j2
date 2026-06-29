@@ -1,0 +1,10 @@
+apiVersion: 1
+datasources:
+  - name: Loki
+    uid: loki-moa
+    type: loki
+    access: proxy
+    url: {{ monitoring_loki_url | default('http://arm.soay-quail.ts.net:3100') }}
+    editable: true
+    jsonData:
+      maxLines: 1000

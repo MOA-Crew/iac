@@ -1,0 +1,10 @@
+---
+- name: Apply central MOA monitoring stack
+  hosts: monitoring
+  become: true
+  gather_facts: true
+
+  roles:
+    - docker
+    - role: monitoring_stack
+      tags: [monitoring, grafana]

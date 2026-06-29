@@ -1,0 +1,22 @@
+{
+  "uid": "moa-api-traffic-errors",
+  "title": "MOA API Traffic & Exception Types",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-6h", "to": "now"},
+  "tags": ["moa", "api", "traffic", "errors", "loki"],
+  "timezone": "browser",
+  "templating": {"list": [
+    {"current": {"selected": false, "text": "All", "value": ".*"}, "datasource": {"type": "loki", "uid": "loki-moa"}, "definition": "label_values({job=\"moa-docker\"}, env)", "hide": 0, "includeAll": true, "label": "env", "multi": true, "name": "env", "query": "label_values({job=\"moa-docker\"}, env)", "refresh": 1, "regex": "", "sort": 1, "type": "query"},
+    {"current": {"selected": false, "text": "All", "value": "moa-be.*"}, "hide": 0, "includeAll": false, "label": "container", "multi": false, "name": "container", "options": [{"selected": true, "text": "All", "value": "moa-be.*"}, {"selected": false, "text": "moa-be-dev", "value": "moa-be-dev"}, {"selected": false, "text": "moa-be-prod", "value": "moa-be-prod"}], "query": "All : moa-be.*,moa-be-dev,moa-be-prod", "type": "custom"}
+  ]},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "API traffic per minute", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 7}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "sum by (env) (count_over_time({job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_ACCESS\" [1m]))", "legendFormat": "{{env}}"}], "fieldConfig": {"defaults": {"unit": "reqpm"}}},
+    {"id": 2, "type": "timeseries", "title": "HTTP status classes", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 7}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "sum by (env, status) (count_over_time({job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_ACCESS\" | regexp \"status=(?P<status>[0-9]+)\" [5m]))", "legendFormat": "{{env}} {{status}}"}], "fieldConfig": {"defaults": {"unit": "req"}}},
+    {"id": 3, "type": "timeseries", "title": "Common exception code count", "gridPos": {"x": 0, "y": 7, "w": 12, "h": 7}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "sum by (env, error_code) (count_over_time({job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_EXCEPTION\" | regexp \"code=(?P<error_code>[^ ]+)\" [5m]))", "legendFormat": "{{env}} {{error_code}}"}], "fieldConfig": {"defaults": {"unit": "short"}}},
+    {"id": 4, "type": "timeseries", "title": "Exception Java class count", "gridPos": {"x": 12, "y": 7, "w": 12, "h": 7}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "sum by (env, exception) (count_over_time({job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_EXCEPTION\" | regexp \"exception=(?P<exception>[^ ]+)\" [5m]))", "legendFormat": "{{env}} {{exception}}"}], "fieldConfig": {"defaults": {"unit": "short"}}},
+    {"id": 5, "type": "table", "title": "Top paths by traffic", "gridPos": {"x": 0, "y": 14, "w": 12, "h": 8}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "topk(20, sum by (env, method, path) (count_over_time({job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_ACCESS\" | regexp \"method=(?P<method>[^ ]+) path=(?P<path>[^ ]+)\" [30m])))", "legendFormat": "{{env}} {{method}} {{path}}"}]},
+    {"id": 6, "type": "logs", "title": "Recent common exceptions", "gridPos": {"x": 12, "y": 14, "w": 12, "h": 8}, "datasource": {"type": "loki", "uid": "loki-moa"}, "targets": [{"refId": "A", "expr": "{job=\"moa-docker\", env=~\"$env\", container=~\"$container\"} |~ \"MOA_API_EXCEPTION\""}], "options": {"dedupStrategy": "none", "enableLogDetails": true, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true}}
+  ]
+}

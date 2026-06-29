@@ -1,0 +1,22 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+      headers:
+        Origin: {{ monitoring_probe_origin | quote }}
+  http_options_cors:
+    prober: http
+    timeout: 5s
+    http:
+      method: OPTIONS
+      preferred_ip_protocol: ip4
+      headers:
+        Origin: {{ monitoring_probe_origin | quote }}
+        Access-Control-Request-Method: GET
+        Access-Control-Request-Headers: authorization,content-type

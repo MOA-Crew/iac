@@ -1,0 +1,76 @@
+---
+- name: Create monitoring project directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ monitoring_project_dir }}"
+    - "{{ monitoring_project_dir }}/prometheus"
+    - "{{ monitoring_project_dir }}/blackbox"
+    - "{{ monitoring_project_dir }}/grafana/provisioning/datasources"
+    - "{{ monitoring_project_dir }}/grafana/provisioning/dashboards"
+    - "{{ monitoring_project_dir }}/grafana/dashboards"
+
+- name: Render monitoring compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ monitoring_project_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_project_dir }}/prometheus/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render blackbox exporter config
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: "{{ monitoring_project_dir }}/blackbox/config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render Loki datasource provisioning
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ monitoring_project_dir }}/grafana/provisioning/datasources/loki.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy Grafana provisioning and dashboards
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ monitoring_project_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: grafana/provisioning/datasources/prometheus.yml
+      dest: grafana/provisioning/datasources/prometheus.yml
+    - src: grafana/provisioning/dashboards/dashboards.yml
+      dest: grafana/provisioning/dashboards/dashboards.yml
+    - src: grafana/dashboards/moa-api-traffic-code.json
+      dest: grafana/dashboards/moa-api-traffic-code.json
+    - src: grafana/dashboards/moa-api-traffic-errors.json
+      dest: grafana/dashboards/moa-api-traffic-errors.json
+
+- name: Pull monitoring images
+  ansible.builtin.command: docker compose pull
+  args:
+    chdir: "{{ monitoring_project_dir }}"
+  changed_when: true
+
+- name: Start monitoring stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ monitoring_project_dir }}"
+  changed_when: true

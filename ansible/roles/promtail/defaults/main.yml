@@ -1,0 +1,6 @@
+---
+promtail_project_dir: /opt/moa/promtail
+promtail_loki_url: http://arm.soay-quail.ts.net:3100/loki/api/v1/push
+promtail_config_path: /etc/promtail/config.yml
+promtail_container_name: moa-promtail
+promtail_image: grafana/promtail:3.4.2
