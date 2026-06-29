@@ -1,0 +1,17 @@
+{
+  "uid": "moa-api-code",
+  "title": "MOA API 호출 상태 코드 / CORS Probe",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "15s",
+  "time": {"from": "now-6h", "to": "now"},
+  "tags": ["moa", "api", "blackbox", "cors"],
+  "timezone": "browser",
+  "panels": [
+    {"id": 1, "type": "stat", "title": "API UP 여부", "gridPos": {"x": 0, "y": 0, "w": 8, "h": 5}, "targets": [{"refId": "A", "expr": "probe_success{job=~\"moa_api_.*\"}", "legendFormat": "{{job}} {{instance}}"}], "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}},
+    {"id": 2, "type": "timeseries", "title": "HTTP Status Code", "gridPos": {"x": 8, "y": 0, "w": 8, "h": 5}, "targets": [{"refId": "A", "expr": "probe_http_status_code{job=~\"moa_api_.*\"}", "legendFormat": "{{job}} {{instance}}"}], "fieldConfig": {"defaults": {"unit": "none", "decimals": 0}}},
+    {"id": 3, "type": "timeseries", "title": "응답 시간 pings (초)", "gridPos": {"x": 16, "y": 0, "w": 8, "h": 5}, "targets": [{"refId": "A", "expr": "probe_duration_seconds{job=~\"moa_api_.*\"}", "legendFormat": "{{job}} {{instance}}"}], "fieldConfig": {"defaults": {"unit": "s"}}},
+    {"id": 4, "type": "timeseries", "title": "TLS 인증서 만료까지 남은 시간", "gridPos": {"x": 0, "y": 5, "w": 12, "h": 7}, "targets": [{"refId": "A", "expr": "(probe_ssl_earliest_cert_expiry{job=\"moa_api_get_probe\"} - time()) / 86400", "legendFormat": "{{instance}}"}], "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 7}, {"color": "green", "value": 30}]}}}},
+    {"id": 5, "type": "timeseries", "title": "CORS Preflight 성공 여부", "gridPos": {"x": 12, "y": 5, "w": 12, "h": 7}, "targets": [{"refId": "A", "expr": "probe_success{job=\"moa_api_cors_preflight_probe\"}", "legendFormat": "{{instance}} OPTIONS"}], "fieldConfig": {"defaults": {"min": 0, "max": 1}}}
+  ]
+}

@@ -1,0 +1,10 @@
+services:
+  promtail:
+    image: {{ promtail_image }}
+    container_name: {{ promtail_container_name }}
+    restart: unless-stopped
+    command: -config.file={{ promtail_config_path }}
+    volumes:
+      - ./config.yml:{{ promtail_config_path }}:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro

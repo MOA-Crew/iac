@@ -1,0 +1,36 @@
+---
+- name: Create promtail project directory
+  ansible.builtin.file:
+    path: "{{ promtail_project_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render promtail compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ promtail_project_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render promtail config
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ promtail_project_dir }}/config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Pull promtail image
+  ansible.builtin.command: docker compose pull
+  args:
+    chdir: "{{ promtail_project_dir }}"
+  changed_when: true
+
+- name: Start promtail
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ promtail_project_dir }}"
+  changed_when: true

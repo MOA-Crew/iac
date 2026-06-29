@@ -1,0 +1,13 @@
+---
+monitoring_project_dir: /opt/moa/monitoring
+monitoring_bind_address: 127.0.0.1
+monitoring_grafana_port: 3001
+monitoring_prometheus_port: 9091
+monitoring_blackbox_port: 9115
+monitoring_loki_url: http://arm.soay-quail.ts.net:3100
+monitoring_grafana_anonymous_enabled: "true"
+monitoring_grafana_anonymous_org_role: Viewer
+monitoring_probe_origin: https://moa.pics
+monitoring_probe_targets:
+  - https://dev-moa.yeoun.org/api/ping
+  - https://moa.yeoun.org/api/ping

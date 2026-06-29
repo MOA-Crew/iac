@@ -1,0 +1,45 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: {{ promtail_loki_url }}
+
+scrape_configs:
+  - job_name: moa-docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 10s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+      - target_label: env
+        replacement: '{{ moa_env | default("unknown") }}'
+      - target_label: host
+        replacement: '{{ inventory_hostname }}'
+      - target_label: job
+        replacement: moa-docker
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: stream
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(moa-be|cloudflared|redis|moa-.*)'
+        action: keep
+    pipeline_stages:
+      - regex:
+          expression: 'MOA_API_ACCESS method=(?P<method>\\S+) path=(?P<path>\\S+) status=(?P<status>\\d+) duration_ms=(?P<duration_ms>\\d+)'
+      - labels:
+          method:
+          path:
+          status:
+      - regex:
+          expression: 'MOA_API_EXCEPTION code=(?P<error_code>\\S+) status=(?P<error_status>\\d+) exception=(?P<exception>\\S+) method=(?P<error_method>\\S+) path=(?P<error_path>\\S+)'
+      - labels:
+          error_code:
+          error_status:
+          exception:
+          error_method:
+          error_path:
